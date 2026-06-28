@@ -1,0 +1,141 @@
+from rest_framework import viewsets, status, permissions
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from django.db import transaction
+
+from .models import Cart, CartItem
+from .serializers import (
+    CartSerializer, CartItemSerializer,
+    AddToCartSerializer, UpdateCartItemSerializer,
+)
+from .permissions import IsCartOwnerOrSession
+
+
+class CartViewSet(viewsets.GenericViewSet):
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+
+    def _get_or_create_cart(self, request):
+        if request.user.is_authenticated:
+            cart, _ = Cart.objects.get_or_create(user=request.user)
+        else:
+            session_key = request.headers.get('X-Session-Key') or request.query_params.get('session_key')
+            if not session_key:
+                return None
+            cart, _ = Cart.objects.get_or_create(session_key=session_key)
+        return cart
+
+    @action(detail=False, methods=['get'])
+    def current(self, request):
+        cart = self._get_or_create_cart(request)
+        if not cart:
+            return Response({'items': [], 'total': '0.00', 'item_count': 0})
+        serializer = CartSerializer(cart)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['post'], url_path='items/add')
+    def add_item(self, request):
+        cart = self._get_or_create_cart(request)
+        if not cart:
+            return Response({'error': 'Se requiere session_key para usuarios anónimos'}, status=400)
+
+        serializer = AddToCartSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        product = serializer.validated_data['product_id']
+        quantity = serializer.validated_data['quantity']
+
+        with transaction.atomic():
+            item, created = CartItem.objects.get_or_create(
+                cart=cart, product=product,
+                defaults={'quantity': quantity}
+            )
+            if not created:
+                item.quantity += quantity
+                if item.quantity > product.variant_inventory_qty:
+                    return Response(
+                        {'error': f"Stock insuficiente. Disponible: {product.variant_inventory_qty}."},
+                        status=400
+                    )
+                item.save()
+
+        return Response(CartItemSerializer(item).data, status=201)
+
+    @action(detail=False, methods=['patch'], url_path='items/(?P<item_id>[0-9]+)')
+    def update_item(self, request, item_id=None):
+        cart = self._get_or_create_cart(request)
+        if not cart:
+            return Response({'error': 'Carrito no encontrado'}, status=404)
+
+        try:
+            item = CartItem.objects.get(id=item_id, cart=cart)
+        except CartItem.DoesNotExist:
+            return Response({'error': 'Item no encontrado'}, status=404)
+
+        serializer = UpdateCartItemSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        quantity = serializer.validated_data['quantity']
+        if quantity > item.product.variant_inventory_qty:
+            return Response(
+                {'error': f"Stock insuficiente. Disponible: {item.product.variant_inventory_qty}."},
+                status=400
+            )
+
+        item.quantity = quantity
+        item.save(update_fields=['quantity'])
+
+        return Response(CartItemSerializer(item).data)
+
+    @action(detail=False, methods=['delete'], url_path='items/(?P<item_id>[0-9]+)')
+    def remove_item(self, request, item_id=None):
+        cart = self._get_or_create_cart(request)
+        if not cart:
+            return Response({'error': 'Carrito no encontrado'}, status=404)
+
+        try:
+            item = CartItem.objects.get(id=item_id, cart=cart)
+        except CartItem.DoesNotExist:
+            return Response({'error': 'Item no encontrado'}, status=404)
+
+        item.delete()
+        return Response(status=204)
+
+    @action(detail=False, methods=['post'])
+    def merge(self, request):
+        if not request.user.is_authenticated:
+            return Response({'error': 'Autenticación requerida'}, status=401)
+
+        session_key = request.headers.get('X-Session-Key')
+        if not session_key:
+            return Response({'error': 'X-Session-Key header requerido'}, status=400)
+
+        user_cart, _ = Cart.objects.get_or_create(user=request.user)
+        try:
+            anon_cart = Cart.objects.get(session_key=session_key)
+        except Cart.DoesNotExist:
+            return Response(CartSerializer(user_cart).data)
+
+        with transaction.atomic():
+            for anon_item in anon_cart.items.select_related('product'):
+                user_item, created = CartItem.objects.get_or_create(
+                    cart=user_cart, product=anon_item.product,
+                    defaults={'quantity': anon_item.quantity}
+                )
+                if not created:
+                    new_qty = user_item.quantity + anon_item.quantity
+                    if new_qty <= anon_item.product.variant_inventory_qty:
+                        user_item.quantity = new_qty
+                        user_item.save(update_fields=['quantity'])
+
+            anon_cart.delete()
+
+        return Response(CartSerializer(user_cart).data)
+
+    @action(detail=False, methods=['delete'])
+    def clear(self, request):
+        cart = self._get_or_create_cart(request)
+        if not cart:
+            return Response({'error': 'Carrito no encontrado'}, status=404)
+
+        cart.items.all().delete()
+        return Response(status=204)
