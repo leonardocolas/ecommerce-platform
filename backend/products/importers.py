@@ -205,7 +205,24 @@ class ProductCsvImporter:
             return
 
         product_data = self.build_product_data(row)
+
+        # Shopify CSVs emit one row per variant, all sharing the same handle.
+        # Subsequent variant rows typically have an empty Title, which means
+        # they are continuation rows for an already-imported product.
+        # We skip them rather than overwriting the primary record with partial data.
+        title_in_row = self.clean_text(row.get("Title"))
         product = self.get_existing_product(row)
+
+        if product is not None and title_in_row is None:
+            # Continuation variant row — product already imported from the first row.
+            self.stats.skipped += 1
+            self.logger.debug(
+                "Fila %s de %s omitida (variante adicional de '%s' sin título propio).",
+                row_number,
+                source_name,
+                handle,
+            )
+            return
 
         try:
             if product is None:

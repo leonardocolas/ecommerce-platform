@@ -28,6 +28,23 @@ class OrderSerializer(serializers.ModelSerializer):
         read_only_fields = ['user', 'status', 'total']
 
 
+class OrderStatusUpdateSerializer(serializers.ModelSerializer):
+    """Used exclusively by STAFF/ADMIN to change an order's status."""
+
+    VALID_STATUSES = [s[0] for s in Order.STATUS_CHOICES]
+
+    class Meta:
+        model = Order
+        fields = ['status']
+
+    def validate_status(self, value):
+        if value not in self.VALID_STATUSES:
+            raise serializers.ValidationError(
+                f"Estado inválido. Opciones válidas: {', '.join(self.VALID_STATUSES)}."
+            )
+        return value
+
+
 class CreateOrderSerializer(serializers.Serializer):
     items = OrderItemSerializer(many=True)
 

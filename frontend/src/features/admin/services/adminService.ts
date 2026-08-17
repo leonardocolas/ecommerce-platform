@@ -1,26 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, '') ?? '/api'
-
-function authHeaders(): Record<string, string> {
-  const token = localStorage.getItem('tienda.accessToken')
-  return {
-    'Content-Type': 'application/json',
-    Accept: 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  }
-}
-
-async function apiFetch(path: string, options: RequestInit = {}): Promise<unknown> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers: { ...authHeaders(), ...options.headers as Record<string, string> },
-    ...options,
-  })
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Error en la solicitud' }))
-    throw new Error(error.error || error.detail || `Error ${response.status}`)
-  }
-  if (response.status === 204) return null
-  return response.json()
-}
+import { apiFetch } from '../../../lib/apiFetch'
 
 export interface AdminUser {
   id: number

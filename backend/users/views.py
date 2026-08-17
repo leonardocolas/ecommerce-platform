@@ -6,17 +6,11 @@ from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.exceptions import TokenError
 
 from .serializers import LoginSerializer, RegisterSerializer, UserAdminSerializer
 
 User = get_user_model()
-
-
-class TestView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        return Response({"msg": "ok"})
 
 
 class RegisterView(generics.CreateAPIView):
@@ -51,6 +45,24 @@ class LoginView(APIView):
             'access': str(refresh.access_token),
             'refresh': str(refresh),
         })
+
+
+class LogoutView(APIView):
+    """Blacklists the provided refresh token so it can no longer be used."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        refresh_token = request.data.get('refresh')
+        if not refresh_token:
+            return Response({'error': 'Se requiere el refresh token.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+        except TokenError:
+            return Response({'error': 'Token inválido o ya fue revocado.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class UserAdminViewSet(viewsets.ModelViewSet):

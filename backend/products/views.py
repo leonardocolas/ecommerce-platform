@@ -8,7 +8,12 @@ class ProductViewSet(viewsets.ModelViewSet):
     serializer_class = ProductSerializer
 
     def get_queryset(self):
-        return Product.objects.all()
+        user = self.request.user
+        # Staff and admin can see all products (including drafts).
+        # Everyone else only sees published products.
+        if user.is_authenticated and user.role in ['ADMIN', 'STAFF', 'PROVIDER']:
+            return Product.objects.all()
+        return Product.objects.filter(published=True)
 
     def get_permissions(self):
         if self.action in ['create']:

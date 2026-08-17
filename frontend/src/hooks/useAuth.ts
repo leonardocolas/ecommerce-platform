@@ -207,6 +207,45 @@ function getInitialSessionState(): StoredSessionState {
   }
 }
 
+/**
+ * Attempts a silent token refresh using the stored refresh token.
+ * Returns the new access token on success, or null if the refresh token
+ * is missing, expired, or blacklisted.
+ */
+export async function tryRefreshToken(): Promise<string | null> {
+  const refreshToken = localStorage.getItem(REFRESH_TOKEN_STORAGE_KEY)
+  if (!refreshToken) return null
+
+  try {
+    const response = await fetch(buildApiUrl('/auth/token/refresh/'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh: refreshToken }),
+    })
+
+    if (!response.ok) {
+      // Refresh token is expired or blacklisted — clear everything.
+      clearStoredSession()
+      return null
+    }
+
+    const data = (await response.json()) as unknown
+    if (!isRecord(data) || typeof data.access !== 'string') return null
+
+    const newAccess = data.access
+    localStorage.setItem(ACCESS_TOKEN_STORAGE_KEY, newAccess)
+
+    // simplejwt with ROTATE_REFRESH_TOKENS returns a new refresh token too.
+    if (typeof data.refresh === 'string') {
+      localStorage.setItem(REFRESH_TOKEN_STORAGE_KEY, data.refresh)
+    }
+
+    return newAccess
+  } catch {
+    return null
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<StoredSessionState>(() => getInitialSessionState())
 
@@ -284,7 +323,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return login(trimmedUsername, password)
   }
 
-  const logout = () => {
+  const logout = async () => {
+    // Blacklist the refresh token on the server before clearing local state.
+    const refreshToken = localStorage.getItem(REFRESH_TOKEN_STORAGE_KEY)
+    const accessToken = localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY)
+
+    if (refreshToken && accessToken) {
+      try {
+        await fetch(buildApiUrl('/auth/logout/'), {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({ refresh: refreshToken }),
+        })
+      } catch {
+        // Ignore network errors — local session is cleared regardless.
+      }
+    }
+
     clearStoredSession()
     setSession({
       user: null,

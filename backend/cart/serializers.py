@@ -1,9 +1,10 @@
 from rest_framework import serializers
 from .models import Cart, CartItem
+from products.models import Product
 
 
 class CartItemSerializer(serializers.ModelSerializer):
-    product_id = serializers.PrimaryKeyRelatedField(queryset=None, source='product', write_only=True)
+    product_id = serializers.PrimaryKeyRelatedField(queryset=Product.objects.none(), source='product', write_only=True)
     product_title = serializers.CharField(source='product.title', read_only=True)
     product_price = serializers.DecimalField(source='product.variant_price', max_digits=10, decimal_places=2, read_only=True)
     product_image = serializers.URLField(source='product.image_src', read_only=True, default=None)
@@ -16,7 +17,6 @@ class CartItemSerializer(serializers.ModelSerializer):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        from products.models import Product
         self.fields['product_id'].queryset = Product.objects.filter(published=True)
 
     def validate_quantity(self, value):
@@ -46,12 +46,11 @@ class CartSerializer(serializers.ModelSerializer):
 
 
 class AddToCartSerializer(serializers.Serializer):
-    product_id = serializers.PrimaryKeyRelatedField(queryset=None)
+    product_id = serializers.PrimaryKeyRelatedField(queryset=Product.objects.none())
     quantity = serializers.IntegerField(default=1, min_value=1)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        from products.models import Product
         self.fields['product_id'].queryset = Product.objects.filter(published=True)
 
     def validate_quantity(self, value):
@@ -62,9 +61,27 @@ class AddToCartSerializer(serializers.Serializer):
     def validate(self, data):
         product = data['product_id']
         quantity = data['quantity']
-        if quantity > product.variant_inventory_qty:
+        stock = product.variant_inventory_qty
+
+        # Considerar unidades que ya están en el carrito para este producto.
+        # El carrito se pasa como contexto desde la view.
+        cart = self.context.get('cart')
+        already_in_cart = 0
+        if cart is not None:
+            try:
+                existing_item = CartItem.objects.get(cart=cart, product=product)
+                already_in_cart = existing_item.quantity
+            except CartItem.DoesNotExist:
+                pass
+
+        if already_in_cart + quantity > stock:
+            available = max(0, stock - already_in_cart)
+            if available == 0:
+                raise serializers.ValidationError(
+                    {"quantity": f"Ya tienes el máximo disponible de '{product.title}' en el carrito."}
+                )
             raise serializers.ValidationError(
-                {"quantity": f"Stock insuficiente. Disponible: {product.variant_inventory_qty}."}
+                {"quantity": f"Stock insuficiente. Puedes agregar {available} unidad(es) más de '{product.title}'."}
             )
         return data
 

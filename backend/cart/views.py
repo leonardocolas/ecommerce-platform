@@ -8,11 +8,11 @@ from .serializers import (
     CartSerializer, CartItemSerializer,
     AddToCartSerializer, UpdateCartItemSerializer,
 )
-from .permissions import IsCartOwnerOrSession
+from .permissions import CartPermission
 
 
 class CartViewSet(viewsets.GenericViewSet):
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    permission_classes = [CartPermission]
 
     def _get_or_create_cart(self, request):
         if request.user.is_authenticated:
@@ -38,7 +38,7 @@ class CartViewSet(viewsets.GenericViewSet):
         if not cart:
             return Response({'error': 'Se requiere session_key para usuarios anónimos'}, status=400)
 
-        serializer = AddToCartSerializer(data=request.data)
+        serializer = AddToCartSerializer(data=request.data, context={'cart': cart})
         serializer.is_valid(raise_exception=True)
 
         product = serializer.validated_data['product_id']
@@ -50,13 +50,14 @@ class CartViewSet(viewsets.GenericViewSet):
                 defaults={'quantity': quantity}
             )
             if not created:
-                item.quantity += quantity
-                if item.quantity > product.variant_inventory_qty:
+                new_qty = item.quantity + quantity
+                if new_qty > product.variant_inventory_qty:
                     return Response(
                         {'error': f"Stock insuficiente. Disponible: {product.variant_inventory_qty}."},
                         status=400
                     )
-                item.save()
+                item.quantity = new_qty
+                item.save(update_fields=['quantity'])
 
         return Response(CartItemSerializer(item).data, status=201)
 

@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from django.db.models import Q
 
 from .models import Order
-from .serializers import OrderSerializer, CreateOrderSerializer
+from .serializers import OrderSerializer, CreateOrderSerializer, OrderStatusUpdateSerializer
 from .permissions import IsOwnerOrAdmin, IsStaffOrAdmin
 
 
@@ -40,6 +40,9 @@ class OrderViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         if self.action == 'create':
             return CreateOrderSerializer
+        # STAFF/ADMIN partial updates use the dedicated status serializer
+        if self.action in ['update', 'partial_update']:
+            return OrderStatusUpdateSerializer
         return OrderSerializer
 
     def get_permissions(self):

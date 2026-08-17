@@ -1,6 +1,6 @@
 import { create } from 'zustand'
+import { apiFetch as sharedApiFetch } from '../../../lib/apiFetch'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, '') ?? '/api'
 const SESSION_KEY_STORAGE_KEY = 'tienda.sessionKey'
 
 function getOrCreateSessionKey(): string {
@@ -9,6 +9,15 @@ function getOrCreateSessionKey(): string {
   const key = crypto.randomUUID()
   localStorage.setItem(SESSION_KEY_STORAGE_KEY, key)
   return key
+}
+
+function sessionHeaders(): Record<string, string> {
+  return { 'X-Session-Key': getOrCreateSessionKey() }
+}
+
+// Cart-specific fetch: always adds the session key header for anonymous support
+async function apiFetch(path: string, options: RequestInit = {}): Promise<unknown> {
+  return sharedApiFetch(path, options, sessionHeaders())
 }
 
 export interface CartItemData {
@@ -29,36 +38,44 @@ export interface CartState {
   loading: boolean
   couponCode: string | null
   discountAmount: number
+
+  /**
+   * IDs de producto cuyo botón está en vuelo (POST /cart/items/add/ en curso).
+   * Evita doble envío y muestra spinner en la card correspondiente.
+   */
+  addingProductIds: Set<number>
+
+  /**
+   * IDs de producto que se acaban de agregar (feedback ¡Agregado! por 2 s).
+   * El timer de limpieza corre dentro del store para que sea independiente
+   * del ciclo de vida de cada ProductCard.
+   */
+  recentlyAddedIds: Set<number>
+
+  /**
+   * IDs de producto cuya cantidad está siendo actualizada (PATCH en curso).
+   * Se usa para deshabilitar los +/- mientras la petición vuela.
+   */
+  updatingProductIds: Set<number>
+
+  // ── Acciones ──────────────────────────────────────────────────────────────
+  fetchCart: () => Promise<void>
   addItem: (productId: number, quantity?: number) => Promise<void>
   removeItem: (itemId: number) => Promise<void>
   updateQuantity: (itemId: number, quantity: number) => Promise<void>
+  /**
+   * Incrementa o decrementa la cantidad de un producto directamente por su
+   * product_id (útil desde la ProductCard sin necesidad de conocer el itemId).
+   * delta = +1 | -1. Si la nueva cantidad llega a 0, elimina el item.
+   */
+  changeProductQuantity: (productId: number, delta: number) => Promise<void>
   clearCart: () => Promise<void>
-  fetchCart: () => Promise<void>
   mergeCart: () => Promise<void>
   applyCoupon: (code: string) => Promise<{ discount: number; message: string }>
   removeCoupon: () => void
-}
 
-function getAuthHeaders(token: string | null): Record<string, string> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
-  }
-  return headers
-}
-
-function getSessionHeaders(): Record<string, string> {
-  return { 'X-Session-Key': getOrCreateSessionKey() }
-}
-
-async function apiFetch(path: string, options: RequestInit = {}): Promise<unknown> {
-  const response = await fetch(`${API_BASE_URL}${path}`, options)
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Error en la solicitud' }))
-    throw new Error(error.error || error.detail || `Error ${response.status}`)
-  }
-  if (response.status === 204) return null
-  return response.json()
+  /** Devuelve el CartItemData del producto si ya está en el carrito. */
+  getCartItem: (productId: number) => CartItemData | undefined
 }
 
 function parseCartResponse(data: unknown) {
@@ -66,10 +83,17 @@ function parseCartResponse(data: unknown) {
   const d = data as Record<string, unknown>
   return {
     items: Array.isArray(d.items) ? (d.items as CartItemData[]) : [],
-    total: typeof d.total === 'string' ? parseFloat(d.total) : (typeof d.total === 'number' ? d.total : 0),
+    total:
+      typeof d.total === 'string'
+        ? parseFloat(d.total)
+        : typeof d.total === 'number'
+          ? d.total
+          : 0,
     itemCount: typeof d.item_count === 'number' ? d.item_count : 0,
   }
 }
+
+// ── Store ─────────────────────────────────────────────────────────────────────
 
 export const useCartStore = create<CartState>((set, get) => ({
   items: [],
@@ -78,18 +102,18 @@ export const useCartStore = create<CartState>((set, get) => ({
   loading: false,
   couponCode: null,
   discountAmount: 0,
+  addingProductIds: new Set<number>(),
+  recentlyAddedIds: new Set<number>(),
+  updatingProductIds: new Set<number>(),
 
+  // ── Selector ────────────────────────────────────────────────────────────────
+  getCartItem: (productId) => get().items.find((i) => i.product_id === productId),
+
+  // ── fetchCart ────────────────────────────────────────────────────────────────
   fetchCart: async () => {
     set({ loading: true })
     try {
-      const token = localStorage.getItem('tienda.accessToken')
-      const headers: Record<string, string> = { Accept: 'application/json' }
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`
-      } else {
-        headers['X-Session-Key'] = getOrCreateSessionKey()
-      }
-      const data = await apiFetch('/cart/current/', { headers })
+      const data = await apiFetch('/cart/current/')
       const parsed = parseCartResponse(data)
       set({ ...parsed, loading: false })
     } catch {
@@ -97,82 +121,122 @@ export const useCartStore = create<CartState>((set, get) => ({
     }
   },
 
-  addItem: async (productId: number, quantity = 1) => {
-    const token = localStorage.getItem('tienda.accessToken')
-    const headers: Record<string, string> = {
-      ...getAuthHeaders(token),
-      ...getSessionHeaders(),
+  // ── addItem ──────────────────────────────────────────────────────────────────
+  addItem: async (productId, quantity = 1) => {
+    const { addingProductIds } = get()
+    if (addingProductIds.has(productId)) return
+
+    set({ addingProductIds: new Set([...addingProductIds, productId]) })
+
+    try {
+      await apiFetch('/cart/items/add/', {
+        method: 'POST',
+        body: JSON.stringify({ product_id: productId, quantity }),
+      })
+      await get().fetchCart()
+
+      // Marcar como recién agregado y programar la limpieza
+      set((s) => ({ recentlyAddedIds: new Set([...s.recentlyAddedIds, productId]) }))
+      setTimeout(() => {
+        set((s) => {
+          const next = new Set(s.recentlyAddedIds)
+          next.delete(productId)
+          return { recentlyAddedIds: next }
+        })
+      }, 2000)
+    } finally {
+      set((s) => {
+        const next = new Set(s.addingProductIds)
+        next.delete(productId)
+        return { addingProductIds: next }
+      })
     }
-    await apiFetch('/cart/items/add/', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ product_id: productId, quantity }),
-    })
+  },
+
+  // ── removeItem (por itemId — usado en CartPage) ───────────────────────────
+  removeItem: async (itemId) => {
+    await apiFetch(`/cart/items/${itemId}/`, { method: 'DELETE' })
     await get().fetchCart()
   },
 
-  removeItem: async (itemId: number) => {
-    const token = localStorage.getItem('tienda.accessToken')
-    const headers: Record<string, string> = {
-      ...getAuthHeaders(token),
-      ...getSessionHeaders(),
-    }
-    await apiFetch(`/cart/items/${itemId}/`, { method: 'DELETE', headers })
-    await get().fetchCart()
-  },
-
-  updateQuantity: async (itemId: number, quantity: number) => {
-    const token = localStorage.getItem('tienda.accessToken')
-    const headers: Record<string, string> = {
-      ...getAuthHeaders(token),
-      ...getSessionHeaders(),
-    }
+  // ── updateQuantity (por itemId — usado en CartPage) ──────────────────────
+  updateQuantity: async (itemId, quantity) => {
     await apiFetch(`/cart/items/${itemId}/`, {
       method: 'PATCH',
-      headers,
       body: JSON.stringify({ quantity }),
     })
     await get().fetchCart()
   },
 
-  clearCart: async () => {
-    const token = localStorage.getItem('tienda.accessToken')
-    const headers: Record<string, string> = {
-      ...getAuthHeaders(token),
-      ...getSessionHeaders(),
-    }
-    await apiFetch('/cart/clear/', { method: 'DELETE', headers })
-    set({ items: [], total: 0, itemCount: 0, couponCode: null, discountAmount: 0 })
-  },
+  // ── changeProductQuantity (por productId — usado en ProductCard) ──────────
+  changeProductQuantity: async (productId, delta) => {
+    const { updatingProductIds } = get()
+    if (updatingProductIds.has(productId)) return
 
-  mergeCart: async () => {
-    const token = localStorage.getItem('tienda.accessToken')
-    if (!token) return
+    const cartItem = get().getCartItem(productId)
+    if (!cartItem) return
+
+    const newQty = cartItem.quantity + delta
+
+    // Actualización optimista: refleja el cambio inmediatamente en la UI
+    set((s) => ({
+      updatingProductIds: new Set([...s.updatingProductIds, productId]),
+      items: s.items.map((i) =>
+        i.product_id === productId ? { ...i, quantity: newQty, subtotal: i.product_price * newQty } : i,
+      ),
+    }))
+
     try {
-      await fetch(`${API_BASE_URL}/cart/merge/`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          'X-Session-Key': getOrCreateSessionKey(),
-        },
-      })
+      if (newQty <= 0) {
+        await apiFetch(`/cart/items/${cartItem.id}/`, { method: 'DELETE' })
+      } else {
+        await apiFetch(`/cart/items/${cartItem.id}/`, {
+          method: 'PATCH',
+          body: JSON.stringify({ quantity: newQty }),
+        })
+      }
+      // Resync con el servidor para reflejar totales correctos
       await get().fetchCart()
     } catch {
-      // silent fail on merge
+      // Revertir la actualización optimista si el servidor la rechaza
+      await get().fetchCart()
+    } finally {
+      set((s) => {
+        const next = new Set(s.updatingProductIds)
+        next.delete(productId)
+        return { updatingProductIds: next }
+      })
     }
   },
 
-  applyCoupon: async (code: string) => {
-    const token = localStorage.getItem('tienda.accessToken')
-    const headers: Record<string, string> = {
-      ...getAuthHeaders(token),
-      ...getSessionHeaders(),
+  // ── clearCart ────────────────────────────────────────────────────────────────
+  clearCart: async () => {
+    await apiFetch('/cart/clear/', { method: 'DELETE' })
+    set({
+      items: [],
+      total: 0,
+      itemCount: 0,
+      couponCode: null,
+      discountAmount: 0,
+      recentlyAddedIds: new Set(),
+    })
+  },
+
+  // ── mergeCart ────────────────────────────────────────────────────────────────
+  mergeCart: async () => {
+    try {
+      await apiFetch('/cart/merge/', { method: 'POST' })
+      await get().fetchCart()
+    } catch {
+      // silent — merge no debe bloquear el login
     }
+  },
+
+  // ── applyCoupon ──────────────────────────────────────────────────────────────
+  applyCoupon: async (code) => {
     try {
       const data = await apiFetch('/coupons/validate/', {
         method: 'POST',
-        headers,
         body: JSON.stringify({ code, subtotal: get().total }),
       })
       const result = data as Record<string, unknown>
@@ -184,7 +248,6 @@ export const useCartStore = create<CartState>((set, get) => ({
     }
   },
 
-  removeCoupon: () => {
-    set({ couponCode: null, discountAmount: 0 })
-  },
+  // ── removeCoupon ─────────────────────────────────────────────────────────────
+  removeCoupon: () => set({ couponCode: null, discountAmount: 0 }),
 }))
