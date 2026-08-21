@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { createOrder } from '../orders/services/orderService'
-import { createPayment, simulatePayment, applyCouponToOrder } from './paymentService'
+import { createPayment, simulatePayment } from './paymentService'
 import { useCartStore } from '../cart/services/cartService'
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
@@ -93,24 +93,16 @@ interface CheckoutModalProps {
 
 export default function CheckoutModal({ onClose }: CheckoutModalProps) {
   const navigate = useNavigate()
-  const { items, total, discountAmount, couponCode, clearCart } = useCartStore()
+  const { items, total, clearCart } = useCartStore()
 
   const [step, setStep] = useState<CheckoutStep>('confirm')
   const [processingLabel, setProcessingLabel] = useState('')
   const [stepsState, setStepsState] = useState<StepInfo[]>([
     { label: 'Crear orden', done: false, active: false },
-    { label: 'Aplicar cupón', done: false, active: false },
     { label: 'Procesar pago', done: false, active: false },
   ])
   const [createdOrderId, setCreatedOrderId] = useState<number | null>(null)
-  const [finalTotal, setFinalTotal] = useState<number>(total - discountAmount)
   const [errorMessage, setErrorMessage] = useState('')
-
-  const hasCoupon = Boolean(couponCode && discountAmount > 0)
-  // Subtotal del carrito antes del descuento del cupón
-  const cartSubtotal = total
-  // Total final que se mostrará al confirmar
-  const displayTotal = cartSubtotal - discountAmount
 
   function markStep(index: number, done: boolean, nextActive: boolean) {
     setStepsState((prev) =>
@@ -147,40 +139,13 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
       return
     }
 
-    // ── Paso 2: Aplicar cupón (si hay) ───────────────────────────────────────
-    if (hasCoupon && couponCode) {
-      setProcessingLabel('Aplicando descuento...')
-      try {
-        const couponResult = await applyCouponToOrder(couponCode, orderId)
-        const newTotal = parseFloat(couponResult.new_total)
-        setFinalTotal(newTotal)
-        markStep(1, true, true)
-      } catch (err) {
-        // El cupón falló pero la orden ya existe — continuamos sin descuento
-        // y marcamos el paso como hecho (sin bloquear el flujo)
-        console.warn('Cupón no pudo aplicarse a la orden:', (err as Error).message)
-        setFinalTotal(cartSubtotal)
-        markStep(1, true, true)
-      }
-    } else {
-      // Sin cupón: marcar paso como completado automáticamente
-      setFinalTotal(cartSubtotal)
-      setStepsState((prev) =>
-        prev.map((s, i) => {
-          if (i === 1) return { ...s, done: true, active: false }
-          if (i === 2) return { ...s, active: true }
-          return s
-        }),
-      )
-    }
-
-    // ── Paso 3: Crear y simular pago ─────────────────────────────────────────
+    // ── Paso 2: Procesar pago ────────────────────────────────────────────────
     setProcessingLabel('Procesando el pago...')
     try {
       const { payment_id } = await createPayment(orderId)
       const result = await simulatePayment(payment_id)
 
-      markStep(2, true, false)
+      markStep(1, true, false)
 
       if (result.status === 'SUCCESS') {
         setStep('success')
@@ -213,10 +178,8 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
     setStep('confirm')
     setErrorMessage('')
     setCreatedOrderId(null)
-    setFinalTotal(total - discountAmount)
     setStepsState([
       { label: 'Crear orden', done: false, active: false },
-      { label: 'Aplicar cupón', done: false, active: false },
       { label: 'Procesar pago', done: false, active: false },
     ])
   }
@@ -259,19 +222,9 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
 
           {/* Resumen de totales */}
           <div className="rounded-xl bg-slate-50 p-4 space-y-2">
-            <div className="flex justify-between text-sm text-slate-600">
-              <span>Subtotal</span>
-              <span>{formatCurrency(cartSubtotal)}</span>
-            </div>
-            {hasCoupon && (
-              <div className="flex justify-between text-sm text-green-600">
-                <span>Descuento ({couponCode})</span>
-                <span>−{formatCurrency(discountAmount)}</span>
-              </div>
-            )}
             <div className="flex justify-between border-t border-slate-200 pt-2 text-base font-bold text-slate-950">
               <span>Total a pagar</span>
-              <span>{formatCurrency(displayTotal)}</span>
+              <span>{formatCurrency(total)}</span>
             </div>
           </div>
 
