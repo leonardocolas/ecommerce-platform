@@ -1,0 +1,505 @@
+{
+  "workspaceId": null,
+  "collectionId": null,
+  "environmentId": null,
+  "collection": {
+    "info": {
+      "name": "Ecommerce Platform API",
+      "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+      "description": "Colección completa de la API REST del proyecto ecommerce. Base URL: {{base_url}}"
+    },
+    "variable": [
+      { "key": "base_url", "value": "http://localhost:8000/api" },
+      { "key": "access_token", "value": "" },
+      { "key": "refresh_token", "value": "" },
+      { "key": "session_key", "value": "test-session-key-001" },
+      { "key": "order_id", "value": "" },
+      { "key": "transaction_id", "value": "" },
+      { "key": "cart_item_id", "value": "" }
+    ],
+    "item": [
+      {
+        "name": "Auth",
+        "item": [
+          {
+            "name": "Register",
+            "request": {
+              "method": "POST",
+              "url": "{{base_url}}/auth/register/",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": {
+                "mode": "raw",
+                "raw": "{\"username\": \"testuser\", \"email\": \"test@example.com\", \"password\": \"TestPass123!\", \"confirmPassword\": \"TestPass123!\"}"
+              }
+            },
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "exec": [
+                    "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                    "pm.test('Returns user and tokens', () => {",
+                    "  const json = pm.response.json();",
+                    "  pm.expect(json).to.have.property('access');",
+                    "  pm.collectionVariables.set('access_token', json.access);",
+                    "  pm.collectionVariables.set('refresh_token', json.refresh);",
+                    "});"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "name": "Login",
+            "request": {
+              "method": "POST",
+              "url": "{{base_url}}/auth/login/",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": {
+                "mode": "raw",
+                "raw": "{\"username\": \"testuser\", \"password\": \"TestPass123!\"}"
+              }
+            },
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "exec": [
+                    "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                    "pm.test('Returns access token', () => {",
+                    "  const json = pm.response.json();",
+                    "  pm.expect(json).to.have.property('access');",
+                    "  pm.collectionVariables.set('access_token', json.access);",
+                    "  pm.collectionVariables.set('refresh_token', json.refresh);",
+                    "});"
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Products",
+        "item": [
+          {
+            "name": "List Products",
+            "request": {
+              "method": "GET",
+              "url": "{{base_url}}/products/"
+            },
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "exec": [
+                    "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                    "pm.test('Returns array', () => {",
+                    "  const json = pm.response.json();",
+                    "  pm.expect(json).to.be.an('array').or.have.property('results');",
+                    "});"
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Cart",
+        "item": [
+          {
+            "name": "Get Current Cart (authenticated)",
+            "request": {
+              "method": "GET",
+              "url": "{{base_url}}/cart/current/",
+              "header": [
+                { "key": "Authorization", "value": "Bearer {{access_token}}" }
+              ]
+            },
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "exec": [
+                    "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                    "pm.test('Cart shape is valid', () => {",
+                    "  const json = pm.response.json();",
+                    "  pm.expect(json).to.have.property('items');",
+                    "  pm.expect(json).to.have.property('total');",
+                    "  pm.expect(json).to.have.property('item_count');",
+                    "});"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "name": "Get Current Cart (anonymous)",
+            "request": {
+              "method": "GET",
+              "url": "{{base_url}}/cart/current/",
+              "header": [
+                { "key": "X-Session-Key", "value": "{{session_key}}" }
+              ]
+            },
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "exec": [
+                    "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                    "pm.test('Cart shape is valid', () => {",
+                    "  const json = pm.response.json();",
+                    "  pm.expect(json).to.have.property('items');",
+                    "});"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "name": "Add Item to Cart",
+            "request": {
+              "method": "POST",
+              "url": "{{base_url}}/cart/items/add/",
+              "header": [
+                { "key": "Authorization", "value": "Bearer {{access_token}}" },
+                { "key": "Content-Type", "value": "application/json" }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\"product_id\": 1, \"quantity\": 1}"
+              }
+            },
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "exec": [
+                    "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                    "pm.test('Returns cart item', () => {",
+                    "  const json = pm.response.json();",
+                    "  pm.expect(json).to.have.property('id');",
+                    "  pm.expect(json).to.have.property('quantity');",
+                    "  pm.collectionVariables.set('cart_item_id', json.id);",
+                    "});"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "name": "Update Cart Item Quantity (PATCH)",
+            "request": {
+              "method": "PATCH",
+              "url": "{{base_url}}/cart/items/{{cart_item_id}}/",
+              "header": [
+                { "key": "Authorization", "value": "Bearer {{access_token}}" },
+                { "key": "Content-Type", "value": "application/json" }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\"quantity\": 3}"
+              }
+            },
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "exec": [
+                    "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                    "pm.test('Quantity updated', () => {",
+                    "  const json = pm.response.json();",
+                    "  pm.expect(json.quantity).to.eql(3);",
+                    "});"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "name": "Remove Cart Item (DELETE)",
+            "request": {
+              "method": "DELETE",
+              "url": "{{base_url}}/cart/items/{{cart_item_id}}/",
+              "header": [
+                { "key": "Authorization", "value": "Bearer {{access_token}}" }
+              ]
+            },
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "exec": [
+                    "pm.test('Status 204', () => pm.response.to.have.status(204));"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "name": "Merge Cart (anon → user)",
+            "request": {
+              "method": "POST",
+              "url": "{{base_url}}/cart/merge/",
+              "header": [
+                { "key": "Authorization", "value": "Bearer {{access_token}}" },
+                { "key": "X-Session-Key", "value": "{{session_key}}" }
+              ]
+            },
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "exec": [
+                    "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                    "pm.test('Returns merged cart', () => {",
+                    "  const json = pm.response.json();",
+                    "  pm.expect(json).to.have.property('items');",
+                    "});"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "name": "Clear Cart",
+            "request": {
+              "method": "DELETE",
+              "url": "{{base_url}}/cart/clear/",
+              "header": [
+                { "key": "Authorization", "value": "Bearer {{access_token}}" }
+              ]
+            },
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "exec": [
+                    "pm.test('Status 204', () => pm.response.to.have.status(204));"
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Orders",
+        "item": [
+          {
+            "name": "Create Order",
+            "request": {
+              "method": "POST",
+              "url": "{{base_url}}/orders/",
+              "header": [
+                { "key": "Authorization", "value": "Bearer {{access_token}}" },
+                { "key": "Content-Type", "value": "application/json" }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\"items\": [{\"product\": 1, \"quantity\": 1}]}"
+              }
+            },
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "exec": [
+                    "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                    "pm.test('Returns order with id', () => {",
+                    "  const json = pm.response.json();",
+                    "  pm.expect(json).to.have.property('id');",
+                    "  pm.expect(json.status).to.eql('CREATED');",
+                    "  pm.collectionVariables.set('order_id', json.id);",
+                    "});"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "name": "List Orders",
+            "request": {
+              "method": "GET",
+              "url": "{{base_url}}/orders/",
+              "header": [
+                { "key": "Authorization", "value": "Bearer {{access_token}}" }
+              ]
+            },
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "exec": [
+                    "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "name": "Get Order Detail",
+            "request": {
+              "method": "GET",
+              "url": "{{base_url}}/orders/{{order_id}}/",
+              "header": [
+                { "key": "Authorization", "value": "Bearer {{access_token}}" }
+              ]
+            },
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "exec": [
+                    "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                    "pm.test('Order has items', () => {",
+                    "  const json = pm.response.json();",
+                    "  pm.expect(json).to.have.property('items');",
+                    "});"
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Payments",
+        "item": [
+          {
+            "name": "Create Payment",
+            "request": {
+              "method": "POST",
+              "url": "{{base_url}}/payments/create/{{order_id}}/",
+              "header": [
+                { "key": "Authorization", "value": "Bearer {{access_token}}" }
+              ]
+            },
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "exec": [
+                    "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                    "pm.test('Returns payment_id', () => {",
+                    "  const json = pm.response.json();",
+                    "  pm.expect(json).to.have.property('payment_id');",
+                    "  pm.collectionVariables.set('transaction_id', json.payment_id);",
+                    "});"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "name": "Simulate Payment",
+            "request": {
+              "method": "POST",
+              "url": "{{base_url}}/payments/simulate/{{transaction_id}}/",
+              "header": [
+                { "key": "Authorization", "value": "Bearer {{access_token}}" }
+              ]
+            },
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "exec": [
+                    "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                    "pm.test('Returns SUCCESS or FAILED', () => {",
+                    "  const json = pm.response.json();",
+                    "  pm.expect(['SUCCESS', 'FAILED']).to.include(json.status);",
+                    "});"
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Coupons",
+        "item": [
+          {
+            "name": "Validate Coupon",
+            "request": {
+              "method": "POST",
+              "url": "{{base_url}}/coupons/validate/",
+              "header": [
+                { "key": "Authorization", "value": "Bearer {{access_token}}" },
+                { "key": "Content-Type", "value": "application/json" }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\"code\": \"DESCUENTO10\", \"subtotal\": \"50.00\"}"
+              }
+            },
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "exec": [
+                    "pm.test('Status 200 or 400', () => {",
+                    "  pm.expect([200, 400]).to.include(pm.response.code);",
+                    "});"
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "name": "Apply Coupon to Order",
+            "request": {
+              "method": "POST",
+              "url": "{{base_url}}/coupons/apply/",
+              "header": [
+                { "key": "Authorization", "value": "Bearer {{access_token}}" },
+                { "key": "Content-Type", "value": "application/json" }
+              ],
+              "body": {
+                "mode": "raw",
+                "raw": "{\"code\": \"DESCUENTO10\", \"order_id\": {{order_id}}}"
+              }
+            },
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "exec": [
+                    "pm.test('Status 200 or 400', () => {",
+                    "  pm.expect([200, 400]).to.include(pm.response.code);",
+                    "});"
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Banners",
+        "item": [
+          {
+            "name": "List Active Banners",
+            "request": {
+              "method": "GET",
+              "url": "{{base_url}}/banners/"
+            },
+            "event": [
+              {
+                "listen": "test",
+                "script": {
+                  "exec": [
+                    "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

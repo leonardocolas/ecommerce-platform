@@ -16,38 +16,43 @@ function CartItemRow({
   item,
   onUpdateQuantity,
   onRemove,
-  updating,
 }: {
   item: ReturnType<typeof useCartStore.getState>['items'][number]
   onUpdateQuantity: (itemId: number, qty: number) => Promise<void>
   onRemove: (itemId: number) => Promise<void>
-  updating: boolean
 }) {
+  // Estado local solo para UI — permite cambiar el número sin esperar al servidor
   const [localQty, setLocalQty] = useState(item.quantity)
   const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  // Sync local qty if the store updates from outside (e.g. fetchCart)
+  // Sincronizar si el store actualiza desde afuera (merge, fetchCart inicial)
   useEffect(() => {
     setLocalQty(item.quantity)
   }, [item.quantity])
 
   const atMin = localQty <= 1
   const atMax = localQty >= item.product_stock
-  const stockWarning = item.product_stock === 0
-    ? 'Sin stock'
-    : localQty >= item.product_stock
-      ? `Máximo disponible: ${item.product_stock}`
-      : null
+
+  const stockWarning =
+    item.product_stock === 0
+      ? 'Sin stock'
+      : localQty >= item.product_stock
+        ? `Máximo disponible: ${item.product_stock}`
+        : null
 
   async function handleChange(newQty: number) {
     if (newQty < 1 || newQty > item.product_stock || busy) return
     setBusy(true)
-    setLocalQty(newQty)
+    setError(null)
+    setLocalQty(newQty) // cambio inmediato en la UI
     try {
       await onUpdateQuantity(item.id, newQty)
-    } catch {
-      // Revert on error
+    } catch (err) {
+      // El store ya revirtió — sincronizamos el local también
       setLocalQty(item.quantity)
+      setError((err as Error).message || 'No se pudo actualizar')
+      setTimeout(() => setError(null), 3000)
     } finally {
       setBusy(false)
     }
@@ -56,32 +61,23 @@ function CartItemRow({
   async function handleRemove() {
     setBusy(true)
     await onRemove(item.id)
-    // no need to reset busy — component unmounts after removal
+    // El componente se desmonta al eliminar, no hace falta resetear busy
   }
 
   return (
     <div
       className={`flex items-center gap-4 rounded-xl border bg-white p-4 shadow-sm transition-opacity ${
-        busy || updating ? 'opacity-60' : 'opacity-100 border-slate-100'
+        busy ? 'opacity-60' : 'opacity-100 border-slate-100'
       }`}
     >
       {/* Image */}
       <div className="h-20 w-20 flex-shrink-0 overflow-hidden rounded-lg bg-slate-100">
         {item.product_image ? (
-          <img
-            src={item.product_image}
-            alt={item.product_title}
-            className="h-full w-full object-cover"
-          />
+          <img src={item.product_image} alt={item.product_title} className="h-full w-full object-cover" />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-slate-400">
             <svg className="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1}
-                d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-              />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
             </svg>
           </div>
         )}
@@ -91,12 +87,11 @@ function CartItemRow({
       <div className="flex-1 min-w-0">
         <h3 className="truncate font-semibold text-slate-950">{item.product_title}</h3>
         <p className="text-sm text-slate-500">{formatCurrency(item.product_price)} c/u</p>
-        {stockWarning && (
-          <p className="mt-0.5 text-xs font-medium text-amber-600">{stockWarning}</p>
-        )}
+        {stockWarning && <p className="mt-0.5 text-xs font-medium text-amber-600">{stockWarning}</p>}
+        {error && <p className="mt-0.5 text-xs font-medium text-red-500">{error}</p>}
       </div>
 
-      {/* Quantity controls */}
+      {/* Quantity controls — puramente local, sin loading global */}
       <div className="flex items-center gap-1">
         <button
           onClick={() => handleChange(localQty - 1)}
@@ -119,7 +114,7 @@ function CartItemRow({
         </button>
       </div>
 
-      {/* Subtotal */}
+      {/* Subtotal — se actualiza con localQty, no espera al servidor */}
       <div className="w-24 text-right">
         <p className="font-semibold text-slate-950">{formatCurrency(item.product_price * localQty)}</p>
       </div>
@@ -140,18 +135,16 @@ function CartItemRow({
 }
 
 export default function CartPage() {
-  const {
-    items,
-    total,
-    itemCount,
-    loading,
-    discountAmount,
-    couponCode,
-    fetchCart,
-    removeItem,
-    updateQuantity,
-    clearCart,
-  } = useCartStore()
+  const items = useCartStore((s) => s.items)
+  const total = useCartStore((s) => s.total)
+  const itemCount = useCartStore((s) => s.itemCount)
+  const loading = useCartStore((s) => s.loading)
+  const discountAmount = useCartStore((s) => s.discountAmount)
+  const couponCode = useCartStore((s) => s.couponCode)
+  const fetchCart = useCartStore((s) => s.fetchCart)
+  const removeItem = useCartStore((s) => s.removeItem)
+  const updateQuantity = useCartStore((s) => s.updateQuantity)
+  const clearCart = useCartStore((s) => s.clearCart)
 
   const { user } = useAuth()
   const [showCheckout, setShowCheckout] = useState(false)
@@ -204,10 +197,18 @@ export default function CartPage() {
               <h3 className="mb-2 text-xl font-semibold text-slate-700">Tu carrito esta vacio</h3>
               <p className="mb-6 text-sm">Agrega productos para verlos aqui.</p>
               <Link
-                to="/"
-                className="inline-flex items-center rounded-full bg-amber-400 px-6 py-3 font-semibold text-slate-950 transition hover:bg-amber-300"
+                to="/products"
+                className="group inline-flex items-center gap-2 rounded-full bg-amber-400 px-7 py-3.5 font-semibold text-slate-950 shadow-md transition hover:bg-amber-300 hover:shadow-lg"
               >
-                Continuar comprando
+                <svg
+                  className="h-4 w-4 transition-transform group-hover:-translate-x-0.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+                </svg>
+                Seguir comprando
               </Link>
             </div>
           ) : (
@@ -219,7 +220,6 @@ export default function CartPage() {
                   item={item}
                   onUpdateQuantity={updateQuantity}
                   onRemove={removeItem}
-                  updating={loading}
                 />
               ))}
 
@@ -279,6 +279,25 @@ export default function CartPage() {
                     Inicia sesion para comprar
                   </Link>
                 )}
+
+                {/* ── Seguir comprando ─────────────────────────────────────── */}
+                <Link
+                  to="/products"
+                  className="group mt-3 flex w-full items-center justify-center gap-2 rounded-full border-2 border-slate-950 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-950 hover:text-amber-400"
+                >
+                  <svg
+                    className="h-4 w-4 transition-transform group-hover:-translate-x-0.5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+                  </svg>
+                  Seguir comprando
+                  <span className="ml-1 rounded-full bg-amber-400 px-2 py-0.5 text-[11px] font-bold text-slate-950 transition group-hover:bg-amber-300">
+                    ¡Hay más!
+                  </span>
+                </Link>
               </div>
             </div>
           )}

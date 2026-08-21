@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { adminUserApi, type AdminUser } from '../services/adminService'
 
 const ROLE_OPTIONS = ['USER', 'PROVIDER', 'STAFF', 'ADMIN']
@@ -9,14 +9,21 @@ export default function AdminUsers() {
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
 
-  const loadUsers = () => {
+  const loadUsers = useCallback(async () => {
     setLoading(true)
-    adminUserApi.list({ search: search || undefined }).then(setUsers).finally(() => setLoading(false))
-  }
+    try {
+      const data = await adminUserApi.list({ search: search || undefined })
+      setUsers(data)
+    } finally {
+      setLoading(false)
+    }
+  }, [search])
 
-  useEffect(() => { loadUsers() }, [])
+  useEffect(() => {
+    void loadUsers()
+  }, [loadUsers])
 
-  const handleSearch = () => { loadUsers() }
+  const handleSearch = () => { void loadUsers() }
 
   const toggleActive = async (user: AdminUser) => {
     await adminUserApi.toggleActive(user.id)

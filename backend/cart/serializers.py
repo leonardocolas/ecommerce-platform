@@ -4,7 +4,7 @@ from products.models import Product
 
 
 class CartItemSerializer(serializers.ModelSerializer):
-    product_id = serializers.PrimaryKeyRelatedField(queryset=Product.objects.none(), source='product', write_only=True)
+    product_id = serializers.IntegerField(source='product.id', read_only=True)
     product_title = serializers.CharField(source='product.title', read_only=True)
     product_price = serializers.DecimalField(source='product.variant_price', max_digits=10, decimal_places=2, read_only=True)
     product_image = serializers.URLField(source='product.image_src', read_only=True, default=None)
@@ -14,10 +14,6 @@ class CartItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = CartItem
         fields = ['id', 'product_id', 'product_title', 'product_price', 'product_image', 'product_stock', 'quantity', 'subtotal']
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields['product_id'].queryset = Product.objects.filter(published=True)
 
     def validate_quantity(self, value):
         if value < 1:

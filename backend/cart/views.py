@@ -61,8 +61,9 @@ class CartViewSet(viewsets.GenericViewSet):
 
         return Response(CartItemSerializer(item).data, status=201)
 
-    @action(detail=False, methods=['patch'], url_path='items/(?P<item_id>[0-9]+)')
-    def update_item(self, request, item_id=None):
+    @action(detail=False, methods=['patch', 'delete'], url_path='items/(?P<item_id>[0-9]+)')
+    def item_detail(self, request, item_id=None):
+        """PATCH para actualizar cantidad, DELETE para eliminar el item."""
         cart = self._get_or_create_cart(request)
         if not cart:
             return Response({'error': 'Carrito no encontrado'}, status=404)
@@ -72,6 +73,11 @@ class CartViewSet(viewsets.GenericViewSet):
         except CartItem.DoesNotExist:
             return Response({'error': 'Item no encontrado'}, status=404)
 
+        if request.method == 'DELETE':
+            item.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
+        # PATCH
         serializer = UpdateCartItemSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -79,27 +85,12 @@ class CartViewSet(viewsets.GenericViewSet):
         if quantity > item.product.variant_inventory_qty:
             return Response(
                 {'error': f"Stock insuficiente. Disponible: {item.product.variant_inventory_qty}."},
-                status=400
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         item.quantity = quantity
         item.save(update_fields=['quantity'])
-
         return Response(CartItemSerializer(item).data)
-
-    @action(detail=False, methods=['delete'], url_path='items/(?P<item_id>[0-9]+)')
-    def remove_item(self, request, item_id=None):
-        cart = self._get_or_create_cart(request)
-        if not cart:
-            return Response({'error': 'Carrito no encontrado'}, status=404)
-
-        try:
-            item = CartItem.objects.get(id=item_id, cart=cart)
-        except CartItem.DoesNotExist:
-            return Response({'error': 'Item no encontrado'}, status=404)
-
-        item.delete()
-        return Response(status=204)
 
     @action(detail=False, methods=['post'])
     def merge(self, request):

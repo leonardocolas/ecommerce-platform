@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Footer from '../../../layout/Footer'
 import Navbar from '../../../layout/Navbar'
@@ -29,7 +29,7 @@ export default function OrderHistoryPage() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
 
-  const loadOrders = async () => {
+  const loadOrders = useCallback(async () => {
     setLoading(true)
     try {
       const data = await fetchOrders({
@@ -44,11 +44,11 @@ export default function OrderHistoryPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [dateFrom, dateTo, searchFilter, statusFilter])
 
   useEffect(() => {
-    loadOrders()
-  }, [])
+    void loadOrders()
+  }, [loadOrders])
 
   return (
     <div className="min-h-screen bg-slate-50">

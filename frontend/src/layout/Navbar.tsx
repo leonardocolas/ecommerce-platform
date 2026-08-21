@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
 import { useAuth } from '../hooks/useAuth'
-import { useCartStore } from '../features/cart/services/cartService'
+import { useCartStore, useCartItemCount } from '../features/cart/services/cartService'
 import logo from '../img/Logo.jpeg'
 
 function SearchIcon() {
@@ -33,7 +33,8 @@ export default function Navbar() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const [searchQuery, setSearchQuery] = useState('')
-  const { itemCount, fetchCart } = useCartStore()
+  const itemCount = useCartItemCount()
+  const fetchCart = useCartStore((s) => s.fetchCart)
   const currentPath =
     typeof window === 'undefined' ? '/' : `${window.location.pathname}${window.location.search}`
 

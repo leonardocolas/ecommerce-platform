@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { useShallow } from 'zustand/react/shallow'
 import { apiFetch as sharedApiFetch } from '../../../lib/apiFetch'
 
 const SESSION_KEY_STORAGE_KEY = 'tienda.sessionKey'
@@ -15,10 +16,11 @@ function sessionHeaders(): Record<string, string> {
   return { 'X-Session-Key': getOrCreateSessionKey() }
 }
 
-// Cart-specific fetch: always adds the session key header for anonymous support
 async function apiFetch(path: string, options: RequestInit = {}): Promise<unknown> {
   return sharedApiFetch(path, options, sessionHeaders())
 }
+
+// ── Tipos ──────────────────────────────────────────────────────────────────────
 
 export interface CartItemData {
   id: number
@@ -38,48 +40,26 @@ export interface CartState {
   loading: boolean
   couponCode: string | null
   discountAmount: number
-
-  /**
-   * IDs de producto cuyo botón está en vuelo (POST /cart/items/add/ en curso).
-   * Evita doble envío y muestra spinner en la card correspondiente.
-   */
   addingProductIds: Set<number>
-
-  /**
-   * IDs de producto que se acaban de agregar (feedback ¡Agregado! por 2 s).
-   * El timer de limpieza corre dentro del store para que sea independiente
-   * del ciclo de vida de cada ProductCard.
-   */
   recentlyAddedIds: Set<number>
-
-  /**
-   * IDs de producto cuya cantidad está siendo actualizada (PATCH en curso).
-   * Se usa para deshabilitar los +/- mientras la petición vuela.
-   */
   updatingProductIds: Set<number>
 
-  // ── Acciones ──────────────────────────────────────────────────────────────
   fetchCart: () => Promise<void>
   addItem: (productId: number, quantity?: number) => Promise<void>
-  removeItem: (itemId: number) => Promise<void>
+  removeItem: (itemId: number, productId?: number) => Promise<void>
   updateQuantity: (itemId: number, quantity: number) => Promise<void>
-  /**
-   * Incrementa o decrementa la cantidad de un producto directamente por su
-   * product_id (útil desde la ProductCard sin necesidad de conocer el itemId).
-   * delta = +1 | -1. Si la nueva cantidad llega a 0, elimina el item.
-   */
   changeProductQuantity: (productId: number, delta: number) => Promise<void>
   clearCart: () => Promise<void>
   mergeCart: () => Promise<void>
   applyCoupon: (code: string) => Promise<{ discount: number; message: string }>
   removeCoupon: () => void
-
-  /** Devuelve el CartItemData del producto si ya está en el carrito. */
   getCartItem: (productId: number) => CartItemData | undefined
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
 function parseCartResponse(data: unknown) {
-  if (!data || typeof data !== 'object') return { items: [], total: 0, itemCount: 0 }
+  if (!data || typeof data !== 'object') return { items: [] as CartItemData[], total: 0, itemCount: 0 }
   const d = data as Record<string, unknown>
   return {
     items: Array.isArray(d.items) ? (d.items as CartItemData[]) : [],
@@ -91,6 +71,16 @@ function parseCartResponse(data: unknown) {
           : 0,
     itemCount: typeof d.item_count === 'number' ? d.item_count : 0,
   }
+}
+
+/**
+ * Recalcula total e itemCount desde el array de items local,
+ * sin necesidad de hacer un GET al servidor.
+ */
+function deriveCartTotals(items: CartItemData[]) {
+  const total = items.reduce((sum, i) => sum + i.product_price * i.quantity, 0)
+  const itemCount = items.reduce((sum, i) => sum + i.quantity, 0)
+  return { total, itemCount }
 }
 
 // ── Store ─────────────────────────────────────────────────────────────────────
@@ -106,10 +96,9 @@ export const useCartStore = create<CartState>((set, get) => ({
   recentlyAddedIds: new Set<number>(),
   updatingProductIds: new Set<number>(),
 
-  // ── Selector ────────────────────────────────────────────────────────────────
   getCartItem: (productId) => get().items.find((i) => i.product_id === productId),
 
-  // ── fetchCart ────────────────────────────────────────────────────────────────
+  // ── fetchCart — solo para carga inicial y post-merge ──────────────────────
   fetchCart: async () => {
     set({ loading: true })
     try {
@@ -121,7 +110,7 @@ export const useCartStore = create<CartState>((set, get) => ({
     }
   },
 
-  // ── addItem ──────────────────────────────────────────────────────────────────
+  // ── addItem — actualiza estado local, sin re-fetch ────────────────────────
   addItem: async (productId, quantity = 1) => {
     const { addingProductIds } = get()
     if (addingProductIds.has(productId)) return
@@ -129,13 +118,21 @@ export const useCartStore = create<CartState>((set, get) => ({
     set({ addingProductIds: new Set([...addingProductIds, productId]) })
 
     try {
-      await apiFetch('/cart/items/add/', {
+      const raw = await apiFetch('/cart/items/add/', {
         method: 'POST',
         body: JSON.stringify({ product_id: productId, quantity }),
       })
-      await get().fetchCart()
+      // El servidor devuelve el CartItem actualizado — lo aplicamos localmente
+      const serverItem = raw as CartItemData
+      set((s) => {
+        const exists = s.items.some((i) => i.product_id === productId)
+        const nextItems = exists
+          ? s.items.map((i) => (i.product_id === productId ? serverItem : i))
+          : [...s.items, serverItem]
+        return { items: nextItems, ...deriveCartTotals(nextItems) }
+      })
 
-      // Marcar como recién agregado y programar la limpieza
+      // Feedback "¡Agregado!" durante 2 s (gestionado en el store, no en la card)
       set((s) => ({ recentlyAddedIds: new Set([...s.recentlyAddedIds, productId]) }))
       setTimeout(() => {
         set((s) => {
@@ -153,22 +150,48 @@ export const useCartStore = create<CartState>((set, get) => ({
     }
   },
 
-  // ── removeItem (por itemId — usado en CartPage) ───────────────────────────
-  removeItem: async (itemId) => {
-    await apiFetch(`/cart/items/${itemId}/`, { method: 'DELETE' })
-    await get().fetchCart()
-  },
-
-  // ── updateQuantity (por itemId — usado en CartPage) ──────────────────────
-  updateQuantity: async (itemId, quantity) => {
-    await apiFetch(`/cart/items/${itemId}/`, {
-      method: 'PATCH',
-      body: JSON.stringify({ quantity }),
+  // ── removeItem — elimina del estado local, sin re-fetch ───────────────────
+  removeItem: async (itemId, productId?) => {
+    // Optimista: quitar del estado antes de la llamada
+    set((s) => {
+      const nextItems = s.items.filter((i) => i.id !== itemId)
+      // Si se provee productId, limpiar también el feedback "recién agregado"
+      const nextRecentlyAdded = productId
+        ? (() => { const n = new Set(s.recentlyAddedIds); n.delete(productId); return n })()
+        : s.recentlyAddedIds
+      return { items: nextItems, recentlyAddedIds: nextRecentlyAdded, ...deriveCartTotals(nextItems) }
     })
-    await get().fetchCart()
+    try {
+      await apiFetch(`/cart/items/${itemId}/`, { method: 'DELETE' })
+    } catch {
+      // Revertir si falla
+      await get().fetchCart()
+    }
   },
 
-  // ── changeProductQuantity (por productId — usado en ProductCard) ──────────
+  // ── updateQuantity (por itemId, usado en CartPage) — sin re-fetch ─────────
+  updateQuantity: async (itemId, quantity) => {
+    // Actualización optimista inmediata
+    set((s) => {
+      const nextItems = s.items.map((i) =>
+        i.id === itemId
+          ? { ...i, quantity, subtotal: i.product_price * quantity }
+          : i,
+      )
+      return { items: nextItems, ...deriveCartTotals(nextItems) }
+    })
+    try {
+      await apiFetch(`/cart/items/${itemId}/`, {
+        method: 'PATCH',
+        body: JSON.stringify({ quantity }),
+      })
+    } catch {
+      // Revertir si el servidor rechaza (ej. stock insuficiente)
+      await get().fetchCart()
+    }
+  },
+
+  // ── changeProductQuantity (por productId, usado en ProductCard) ───────────
   changeProductQuantity: async (productId, delta) => {
     const { updatingProductIds } = get()
     if (updatingProductIds.has(productId)) return
@@ -177,14 +200,25 @@ export const useCartStore = create<CartState>((set, get) => ({
     if (!cartItem) return
 
     const newQty = cartItem.quantity + delta
+    // Bloquear mientras vuela la petición (solo deshabilita el botón, no recarga nada)
+    set((s) => ({ updatingProductIds: new Set([...s.updatingProductIds, productId]) }))
 
-    // Actualización optimista: refleja el cambio inmediatamente en la UI
-    set((s) => ({
-      updatingProductIds: new Set([...s.updatingProductIds, productId]),
-      items: s.items.map((i) =>
-        i.product_id === productId ? { ...i, quantity: newQty, subtotal: i.product_price * newQty } : i,
-      ),
-    }))
+    // Actualización optimista: cambia el número en el store inmediatamente
+    if (newQty <= 0) {
+      set((s) => {
+        const nextItems = s.items.filter((i) => i.product_id !== productId)
+        return { items: nextItems, ...deriveCartTotals(nextItems) }
+      })
+    } else {
+      set((s) => {
+        const nextItems = s.items.map((i) =>
+          i.product_id === productId
+            ? { ...i, quantity: newQty, subtotal: i.product_price * newQty }
+            : i,
+        )
+        return { items: nextItems, ...deriveCartTotals(nextItems) }
+      })
+    }
 
     try {
       if (newQty <= 0) {
@@ -195,10 +229,9 @@ export const useCartStore = create<CartState>((set, get) => ({
           body: JSON.stringify({ quantity: newQty }),
         })
       }
-      // Resync con el servidor para reflejar totales correctos
-      await get().fetchCart()
+      // Éxito: el estado local ya es correcto, no hay re-fetch
     } catch {
-      // Revertir la actualización optimista si el servidor la rechaza
+      // Solo revertir si el servidor lo rechaza
       await get().fetchCart()
     } finally {
       set((s) => {
@@ -209,30 +242,23 @@ export const useCartStore = create<CartState>((set, get) => ({
     }
   },
 
-  // ── clearCart ────────────────────────────────────────────────────────────────
+  // ── clearCart ─────────────────────────────────────────────────────────────
   clearCart: async () => {
     await apiFetch('/cart/clear/', { method: 'DELETE' })
-    set({
-      items: [],
-      total: 0,
-      itemCount: 0,
-      couponCode: null,
-      discountAmount: 0,
-      recentlyAddedIds: new Set(),
-    })
+    set({ items: [], total: 0, itemCount: 0, couponCode: null, discountAmount: 0, recentlyAddedIds: new Set() })
   },
 
-  // ── mergeCart ────────────────────────────────────────────────────────────────
+  // ── mergeCart — sí necesita re-fetch porque el servidor fusiona dos carritos
   mergeCart: async () => {
     try {
       await apiFetch('/cart/merge/', { method: 'POST' })
       await get().fetchCart()
     } catch {
-      // silent — merge no debe bloquear el login
+      // silent
     }
   },
 
-  // ── applyCoupon ──────────────────────────────────────────────────────────────
+  // ── applyCoupon ───────────────────────────────────────────────────────────
   applyCoupon: async (code) => {
     try {
       const data = await apiFetch('/coupons/validate/', {
@@ -248,6 +274,29 @@ export const useCartStore = create<CartState>((set, get) => ({
     }
   },
 
-  // ── removeCoupon ─────────────────────────────────────────────────────────────
   removeCoupon: () => set({ couponCode: null, discountAmount: 0 }),
 }))
+
+// ── Selectores granulares (evitan re-renders innecesarios) ────────────────────
+
+/** Solo re-renderiza cuando cambia itemCount — para el Navbar badge */
+export function useCartItemCount() {
+  return useCartStore((s) => s.itemCount)
+}
+
+/** Solo re-renderiza cuando cambia el item de este producto — para ProductCard */
+export function useCartItemForProduct(productId: number) {
+  return useCartStore(
+    useShallow((s) => {
+      const item = s.items.find((i) => i.product_id === productId)
+      return {
+        cartItem: item,
+        inCart: item !== undefined,
+        qtyInCart: item?.quantity ?? 0,
+        adding: s.addingProductIds.has(productId),
+        recentlyAdded: s.recentlyAddedIds.has(productId),
+        updatingQty: s.updatingProductIds.has(productId),
+      }
+    }),
+  )
+}

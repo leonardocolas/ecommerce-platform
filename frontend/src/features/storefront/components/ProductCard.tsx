@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 
 import type { CatalogProduct } from '../services/productCatalog'
-import { useCartStore } from '../../cart/services/cartService'
+import { useCartStore, useCartItemForProduct } from '../../cart/services/cartService'
 
 type ProductCardProps = {
   product: CatalogProduct
@@ -16,60 +16,6 @@ function formatCurrency(amount: number) {
   return new Intl.NumberFormat('es-CU', { style: 'currency', currency: 'USD' }).format(amount)
 }
 
-// ── Botón +/- para controlar cantidad desde la card ───────────────────────────
-function CartQuantityControl({
-  productId,
-  quantity,
-  stock,
-  disabled,
-}: {
-  productId: number
-  quantity: number
-  stock: number
-  disabled: boolean
-}) {
-  const { changeProductQuantity } = useCartStore()
-
-  const atMin = quantity <= 1
-  const atMax = quantity >= stock
-
-  return (
-    <div className="flex items-center justify-between rounded-2xl border border-amber-400 bg-amber-50 px-3 py-2">
-      <button
-        type="button"
-        onClick={() => changeProductQuantity(productId, -1)}
-        disabled={disabled || atMin}
-        aria-label="Disminuir cantidad"
-        className="flex h-7 w-7 items-center justify-center rounded-full border border-amber-300 text-amber-700 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-40"
-      >
-        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M20 12H4" />
-        </svg>
-      </button>
-
-      <span className="flex items-center gap-1.5 text-sm font-bold text-amber-800 tabular-nums">
-        <svg className="h-3.5 w-3.5 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13l-1 3h10M16 17a1 1 0 100 2 1 1 0 000-2zM9 17a1 1 0 100 2 1 1 0 000-2z" />
-        </svg>
-        {quantity}
-        {atMax && <span className="text-[10px] font-normal text-amber-600">(máx)</span>}
-      </span>
-
-      <button
-        type="button"
-        onClick={() => changeProductQuantity(productId, +1)}
-        disabled={disabled || atMax}
-        aria-label="Aumentar cantidad"
-        className="flex h-7 w-7 items-center justify-center rounded-full border border-amber-300 text-amber-700 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-40"
-      >
-        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-        </svg>
-      </button>
-    </div>
-  )
-}
-
 // ── ProductCard ───────────────────────────────────────────────────────────────
 export default function ProductCard({
   product,
@@ -77,19 +23,16 @@ export default function ProductCard({
   onPurchaseIntent,
 }: ProductCardProps) {
   const location = useLocation()
+  const navigate = useNavigate()
   const providerName = product.provider.trim() || DEFAULT_PROVIDER_NAME
   const redirectTo = `${location.pathname}${location.search}`
 
-  const { addItem, addingProductIds, recentlyAddedIds, updatingProductIds, getCartItem } =
-    useCartStore()
+  const addItem = useCartStore((s) => s.addItem)
+  const removeItem = useCartStore((s) => s.removeItem)
 
-  const cartItem = getCartItem(product.id)
-  const inCart = cartItem !== undefined
-  const qtyInCart = cartItem?.quantity ?? 0
-
-  const adding = addingProductIds.has(product.id)
-  const recentlyAdded = recentlyAddedIds.has(product.id)
-  const updatingQty = updatingProductIds.has(product.id)
+  // Selector granular: solo re-renderiza esta card cuando cambia SU producto
+  const { cartItem, inCart, qtyInCart, adding, recentlyAdded, updatingQty } =
+    useCartItemForProduct(product.id)
 
   const outOfStock = product.stock <= 0
   // Solo bloqueamos si ya tiene el máximo exacto en el carrito
@@ -103,7 +46,6 @@ export default function ProductCard({
     setErrorMsg(null)
     try {
       await addItem(product.id, 1)
-      // El feedback "recién agregado" lo gestiona el store con recentlyAddedIds
     } catch (err) {
       const msg = (err as Error).message || 'No se pudo agregar al carrito'
       setErrorMsg(msg)
@@ -111,11 +53,21 @@ export default function ProductCard({
     }
   }
 
-  // ── Qué muestra el botón inicial de "Agregar" (cuando NO está en carrito) ──
+  async function handleRemoveFromCart() {
+    if (!cartItem) return
+    try {
+      await removeItem(cartItem.id, product.id)
+    } catch (err) {
+      const msg = (err as Error).message || 'No se pudo remover del carrito'
+      setErrorMsg(msg)
+      setTimeout(() => setErrorMsg(null), 4000)
+    }
+  }
+
+  // ── Qué muestra el botón de "Agregar" (cuando NO está en carrito y no es recentlyAdded) ──
   function addButtonLabel() {
     if (outOfStock) return 'Sin stock'
     if (adding) return 'Agregando...'
-    if (recentlyAdded) return '¡Agregado!'
     return 'Agregar al carrito'
   }
 
@@ -124,9 +76,6 @@ export default function ProductCard({
       'inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold transition'
     if (outOfStock || adding) {
       return `${base} border border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed`
-    }
-    if (recentlyAdded) {
-      return `${base} border border-green-400 bg-green-50 text-green-700`
     }
     return `${base} border border-slate-950 text-slate-950 hover:bg-slate-950 hover:text-white`
   }
@@ -194,35 +143,52 @@ export default function ProductCard({
           <div className="mt-4 flex flex-col gap-3">
             {isAuthenticated ? (
               <>
-                {/* ── Si ya está en carrito → controles +/- ─────────────────── */}
-                {inCart ? (
-                  <CartQuantityControl
-                    productId={product.id}
-                    quantity={qtyInCart}
-                    stock={product.stock}
+                {/*
+                 * Prioridad de estados del botón principal:
+                 * 1. recentlyAdded  → verde "¡Agregado!" (2 s de feedback, aunque inCart ya sea true)
+                 * 2. inCart         → rojo "Remover del carrito"
+                 * 3. default        → "Agregar al carrito"
+                 */}
+                {recentlyAdded ? (
+                  /* ── Feedback inmediato tras agregar ────────────────────────── */
+                  <button
+                    type="button"
+                    disabled
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl border border-green-400 bg-green-50 px-4 py-3 text-sm font-semibold text-green-700 cursor-default"
+                  >
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                    </svg>
+                    ¡Agregado!
+                  </button>
+                ) : inCart ? (
+                  /* ── Producto en carrito → Remover ──────────────────────────── */
+                  <button
+                    type="button"
+                    onClick={handleRemoveFromCart}
                     disabled={updatingQty}
-                  />
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl border border-red-300 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 transition hover:border-red-600 hover:bg-red-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    Remover del carrito
+                  </button>
                 ) : (
-                  /* ── Si NO está en carrito → botón de agregar ──────────────── */
+                  /* ── Producto no está en carrito → Agregar ──────────────────── */
                   <button
                     type="button"
                     onClick={handleAddToCart}
                     disabled={adding || outOfStock}
                     className={addButtonClass()}
                   >
-                    {recentlyAdded ? (
-                      /* Ícono de check cuando se acaba de agregar */
-                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                      </svg>
-                    ) : null}
                     {addButtonLabel()}
                   </button>
                 )}
 
                 <button
                   type="button"
-                  onClick={() => onPurchaseIntent(product)}
+                  onClick={() => navigate('/cart')}
                   disabled={outOfStock}
                   className="inline-flex items-center justify-center rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-amber-500 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
                 >
