@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import Footer from '../../../layout/Footer'
 import Navbar from '../../../layout/Navbar'
 import { useCartStore } from '../services/cartService'
+import CouponInput from '../components/CouponInput'
 import CheckoutModal from '../../payments/CheckoutModal'
 import { useAuth } from '../../../hooks/useAuth'
 
@@ -138,6 +139,8 @@ export default function CartPage() {
   const total = useCartStore((s) => s.total)
   const itemCount = useCartStore((s) => s.itemCount)
   const loading = useCartStore((s) => s.loading)
+  const discountAmount = useCartStore((s) => s.discountAmount)
+  const couponCode = useCartStore((s) => s.couponCode)
   const fetchCart = useCartStore((s) => s.fetchCart)
   const removeItem = useCartStore((s) => s.removeItem)
   const updateQuantity = useCartStore((s) => s.updateQuantity)
@@ -149,6 +152,8 @@ export default function CartPage() {
   useEffect(() => {
     fetchCart()
   }, [fetchCart])
+
+  const finalTotal = total - discountAmount
 
   // Stock warning: any item has quantity > available stock
   const hasStockIssue = items.some((item) => item.quantity > item.product_stock)
@@ -195,7 +200,14 @@ export default function CartPage() {
                 to="/products"
                 className="group inline-flex items-center gap-2 rounded-full bg-amber-400 px-7 py-3.5 font-semibold text-slate-950 shadow-md transition hover:bg-amber-300 hover:shadow-lg"
               >
-             
+                <svg
+                  className="h-4 w-4 transition-transform group-hover:-translate-x-0.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+                </svg>
                 Seguir comprando
               </Link>
             </div>
@@ -224,16 +236,45 @@ export default function CartPage() {
               {/* Seguir comprando - moved below product list */}
               <Link
                 to="/products"
-                className="group block w-full rounded-2xl bg-gradient-to-r from-amber-400 via-orange-400 to-amber-500 px-6 py-4 font-semibold text-slate-950 text-center shadow-lg shadow-amber-400/30 transition-all duration-300 hover:from-amber-500 hover:via-orange-500 hover:to-amber-600 hover:shadow-xl hover:shadow-amber-500/40 hover:-translate-y-1 focus:outline-none focus:ring-4 focus:ring-amber-400/50"
+                className="group block w-full rounded-2xl bg-gradient-to-r from-amber-400 via-orange-400 to-amber-500 px-6 py-4 font-semibold text-slate-950 shadow-lg shadow-amber-400/30 transition-all duration-300 hover:from-amber-500 hover:via-orange-500 hover:to-amber-600 hover:shadow-xl hover:shadow-amber-500/40 hover:-translate-y-1 focus:outline-none focus:ring-4 focus:ring-amber-400/50"
               >
-                Seguir comprando
+                <div className="flex items-center justify-center gap-3">
+                  <svg
+                    className="h-5 w-5 transition-transform group-hover:-translate-x-1"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+                  </svg>
+                  <span className="tracking-wide">Seguir comprando</span>
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-950/10 text-slate-950 transition-all group-hover:bg-slate-950/20 group-hover:scale-110">
+                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </span>
+                </div>
               </Link>
 
               {/* Summary panel */}
               <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50 p-6">
-                <div className="flex justify-between border-t border-slate-200 pt-3 text-lg font-bold text-slate-950">
-                  <span>Total</span>
-                  <span>{formatCurrency(total)}</span>
+                <CouponInput />
+
+                <div className="mt-4 space-y-2 border-t border-slate-200 pt-4">
+                  <div className="flex justify-between text-sm text-slate-600">
+                    <span>Subtotal</span>
+                    <span>{formatCurrency(total)}</span>
+                  </div>
+                  {discountAmount > 0 && (
+                    <div className="flex justify-between text-sm font-medium text-green-600">
+                      <span>Descuento ({couponCode})</span>
+                      <span>−{formatCurrency(discountAmount)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between border-t border-slate-200 pt-3 text-lg font-bold text-slate-950">
+                    <span>Total</span>
+                    <span>{formatCurrency(finalTotal)}</span>
+                  </div>
                 </div>
 
                 {/* Stock warning */}
@@ -248,7 +289,7 @@ export default function CartPage() {
                   <button
                     onClick={() => setShowCheckout(true)}
                     disabled={hasStockIssue || items.length === 0}
-                    className="mt-5 w-full rounded-2xl bg-gradient-to-r from-amber-400 via-orange-400 to-amber-500 px-6 py-4 font-semibold text-slate-950 text-center shadow-lg shadow-amber-400/30 transition-all duration-300 hover:from-amber-500 hover:via-orange-500 hover:to-amber-600 hover:shadow-xl hover:shadow-amber-500/40 hover:-translate-y-1 focus:outline-none focus:ring-4 focus:ring-amber-400/50 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:from-amber-400 disabled:hover:via-orange-400 disabled:hover:to-amber-500 disabled:hover:-translate-y-0 disabled:hover:shadow-lg"
+                    className="mt-5 w-full rounded-full bg-amber-400 py-3 font-semibold text-slate-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Proceder al pago
                   </button>
@@ -256,7 +297,7 @@ export default function CartPage() {
                   <Link
                     to="/login"
                     state={{ from: '/cart' }}
-                    className="mt-5 block w-full rounded-2xl bg-gradient-to-r from-amber-400 via-orange-400 to-amber-500 px-6 py-4 font-semibold text-slate-950 text-center shadow-lg shadow-amber-400/30 transition-all duration-300 hover:from-amber-500 hover:via-orange-500 hover:to-amber-600 hover:shadow-xl hover:shadow-amber-500/40 hover:-translate-y-1 focus:outline-none focus:ring-4 focus:ring-amber-400/50"
+                    className="mt-5 block w-full rounded-full bg-amber-400 py-3 text-center font-semibold text-slate-950 transition hover:bg-amber-300"
                   >
                     Inicia sesion para comprar
                   </Link>
