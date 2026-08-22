@@ -1,5 +1,9 @@
+from decimal import Decimal
+
 from rest_framework import viewsets, permissions, status
+from rest_framework.decorators import action
 from rest_framework.response import Response
+from django.db import transaction
 from django.db.models import Q
 
 from .models import Order
@@ -32,7 +36,8 @@ class OrderViewSet(viewsets.ModelViewSet):
         if search:
             qs = qs.filter(
                 Q(items__product__title__icontains=search) |
-                Q(id__icontains=search)
+                Q(id__icontains=search) |
+                Q(user__username__icontains=search)
             ).distinct()
 
         return qs.order_by('-created_at')
@@ -40,7 +45,6 @@ class OrderViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         if self.action == 'create':
             return CreateOrderSerializer
-        # STAFF/ADMIN partial updates use the dedicated status serializer
         if self.action in ['update', 'partial_update']:
             return OrderStatusUpdateSerializer
         return OrderSerializer
@@ -48,9 +52,33 @@ class OrderViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action == 'create':
             return [permissions.IsAuthenticated()]
-        elif self.action in ['update', 'partial_update', 'destroy']:
+        elif self.action in ['update', 'partial_update', 'destroy', 'refund']:
             return [IsStaffOrAdmin()]
         return [permissions.IsAuthenticated(), IsOwnerOrAdmin()]
 
     def perform_create(self, serializer):
         serializer.save()
+
+    @action(detail=True, methods=['post'])
+    def refund(self, request, pk=None):
+        order = self.get_object()
+
+        if order.status not in ['PAID', 'PROCESSING']:
+            return Response(
+                {'error': 'Solo se pueden reembolsar ordenes pagadas o en proceso.'},
+                status=400,
+            )
+
+        with transaction.atomic():
+            for item in order.items.select_related('product'):
+                product = item.product
+                product.variant_inventory_qty += item.quantity
+                product.save(update_fields=['variant_inventory_qty'])
+
+            from payments.models import Payment
+            Payment.objects.filter(order=order, status='SUCCESS').update(status='FAILED')
+
+            order.status = 'CANCELED'
+            order.save(update_fields=['status'])
+
+        return Response({'status': 'CANCELED', 'message': 'Reembolso procesado. Stock restaurado.'})

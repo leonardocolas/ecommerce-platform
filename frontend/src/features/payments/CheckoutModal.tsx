@@ -93,7 +93,8 @@ interface CheckoutModalProps {
 
 export default function CheckoutModal({ onClose }: CheckoutModalProps) {
   const navigate = useNavigate()
-  const { items, total, clearCart } = useCartStore()
+  const { items, total, clearCart, discountAmount } = useCartStore()
+  const finalTotal = total - discountAmount
 
   const [step, setStep] = useState<CheckoutStep>('confirm')
   const [processingLabel, setProcessingLabel] = useState('')
