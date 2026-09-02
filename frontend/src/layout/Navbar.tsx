@@ -110,6 +110,8 @@ export default function Navbar() {
             </Link>
           )}
 
+          {user && <Link to="/profile" className="hidden rounded-full px-3 py-2 text-sm text-slate-700 transition hover:bg-amber-50 hover:text-amber-600 sm:inline-block">Mi perfil</Link>}
+
           {isAdmin && (
             <Link
               to="/admin"

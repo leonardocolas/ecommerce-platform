@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Product
+from .models import Product, InventoryMovement
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
@@ -57,3 +57,11 @@ class ProductAdmin(admin.ModelAdmin):
         if not change:  # Si es creación
             obj.provider = request.user
         super().save_model(request, obj, form, change)
+
+
+@admin.register(InventoryMovement)
+class InventoryMovementAdmin(admin.ModelAdmin):
+    list_display = ('product', 'variant', 'quantity', 'reason', 'reference', 'actor', 'created_at')
+    list_filter = ('reason', 'created_at')
+    search_fields = ('product__title', 'reference')
+    readonly_fields = ('created_at',)

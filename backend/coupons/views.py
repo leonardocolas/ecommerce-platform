@@ -1,6 +1,7 @@
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from users.permissions import IsStaffOrAdminRole
 
 from .models import Coupon
 from .serializers import (
@@ -17,7 +18,7 @@ class CouponViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
             return [permissions.IsAuthenticated()]
-        return [permissions.IsAdminUser()]
+        return [IsStaffOrAdminRole()]
 
     @action(detail=False, methods=['post'])
     def validate(self, request):

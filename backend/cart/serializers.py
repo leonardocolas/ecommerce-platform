@@ -1,19 +1,29 @@
 from rest_framework import serializers
 from .models import Cart, CartItem
-from products.models import Product
+from products.models import Product, ProductVariant
 
 
 class CartItemSerializer(serializers.ModelSerializer):
     product_id = serializers.IntegerField(source='product.id', read_only=True)
+    variant_id = serializers.IntegerField(source='variant.id', read_only=True, allow_null=True)
     product_title = serializers.CharField(source='product.title', read_only=True)
-    product_price = serializers.DecimalField(source='product.variant_price', max_digits=10, decimal_places=2, read_only=True)
-    product_image = serializers.URLField(source='product.image_src', read_only=True, default=None)
-    product_stock = serializers.IntegerField(source='product.variant_inventory_qty', read_only=True)
+    product_price = serializers.SerializerMethodField()
+    product_image = serializers.SerializerMethodField()
+    product_stock = serializers.SerializerMethodField()
     subtotal = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
 
     class Meta:
         model = CartItem
-        fields = ['id', 'product_id', 'product_title', 'product_price', 'product_image', 'product_stock', 'quantity', 'subtotal']
+        fields = ['id', 'product_id', 'variant_id', 'product_title', 'product_price', 'product_image', 'product_stock', 'quantity', 'subtotal']
+
+    def get_product_price(self, obj):
+        return obj.variant.price if obj.variant else obj.product.variant_price
+
+    def get_product_stock(self, obj):
+        return obj.variant.inventory_qty if obj.variant else obj.product.variant_inventory_qty
+
+    def get_product_image(self, obj):
+        return (obj.variant.image or obj.product.image_src) if obj.variant else obj.product.image_src
 
     def validate_quantity(self, value):
         if value < 1:
@@ -43,6 +53,7 @@ class CartSerializer(serializers.ModelSerializer):
 
 class AddToCartSerializer(serializers.Serializer):
     product_id = serializers.PrimaryKeyRelatedField(queryset=Product.objects.none())
+    variant_id = serializers.PrimaryKeyRelatedField(queryset=ProductVariant.objects.filter(is_active=True), required=False, allow_null=True)
     quantity = serializers.IntegerField(default=1, min_value=1)
 
     def __init__(self, *args, **kwargs):
@@ -56,8 +67,11 @@ class AddToCartSerializer(serializers.Serializer):
 
     def validate(self, data):
         product = data['product_id']
+        variant = data.get('variant_id')
+        if variant and variant.product_id != product.id:
+            raise serializers.ValidationError({'variant_id': 'La variante no pertenece a este producto.'})
         quantity = data['quantity']
-        stock = product.variant_inventory_qty
+        stock = variant.inventory_qty if variant else product.variant_inventory_qty
 
         # Considerar unidades que ya están en el carrito para este producto.
         # El carrito se pasa como contexto desde la view.
@@ -65,7 +79,7 @@ class AddToCartSerializer(serializers.Serializer):
         already_in_cart = 0
         if cart is not None:
             try:
-                existing_item = CartItem.objects.get(cart=cart, product=product)
+                existing_item = CartItem.objects.get(cart=cart, product=product, variant=variant)
                 already_in_cart = existing_item.quantity
             except CartItem.DoesNotExist:
                 pass

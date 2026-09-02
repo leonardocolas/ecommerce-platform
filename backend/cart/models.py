@@ -1,7 +1,7 @@
 import uuid
 from django.db import models
 from django.conf import settings
-from products.models import Product
+from products.models import Product, ProductVariant
 
 User = settings.AUTH_USER_MODEL
 
@@ -22,7 +22,7 @@ class Cart(models.Model):
 
     @property
     def total(self):
-        return sum(item.subtotal for item in self.items.select_related('product'))
+        return sum(item.subtotal for item in self.items.select_related('product', 'variant'))
 
     @property
     def item_count(self):
@@ -32,16 +32,18 @@ class Cart(models.Model):
 class CartItem(models.Model):
     cart = models.ForeignKey(Cart, related_name='items', on_delete=models.CASCADE)
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    variant = models.ForeignKey(ProductVariant, null=True, blank=True, on_delete=models.CASCADE)
     quantity = models.PositiveIntegerField(default=1)
     added_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ['added_at']
-        unique_together = ['cart', 'product']
+        unique_together = ['cart', 'product', 'variant']
 
     def __str__(self):
-        return f"{self.product.title} x {self.quantity}"
+        label = self.variant.sku if self.variant else self.product.title
+        return f"{label} x {self.quantity}"
 
     @property
     def subtotal(self):
-        return self.product.variant_price * self.quantity
+        return (self.variant.price if self.variant else self.product.variant_price) * self.quantity

@@ -10,6 +10,37 @@ export interface CatalogProduct {
   categoryLabel: string
   imageUrl: string | null
   tags: string[]
+  variants: CatalogVariant[]
+  images: CatalogImage[]
+}
+
+export interface CatalogVariant {
+  id: number
+  sku: string
+  option1_name: string
+  option1_value: string
+  option2_name: string
+  option2_value: string
+  option3_name: string
+  option3_value: string
+  price: number
+  inventory_qty: number
+  image: string
+  is_active: boolean
+}
+
+export interface CatalogImage {
+  id: number
+  image_url: string
+  alt_text: string
+  position: number
+}
+
+export interface CatalogPage {
+  products: CatalogProduct[]
+  count: number
+  next: string | null
+  previous: string | null
 }
 
 const API_BASE_URL = import.meta.env.VITE_API_URL?.replace(/\/$/, '') ?? '/api'
@@ -261,6 +292,20 @@ function parseCatalogProduct(payload: unknown): CatalogProduct | null {
   const tags = splitTags(payload.tags)
   const rawCategory = readString(payload.product_type) ?? readString(payload.category)
   const imageUrl = readString(payload.image_src) ?? readString(payload.imageUrl)
+  const variants = isRecord(payload) && Array.isArray(payload.variants)
+    ? payload.variants.filter(isRecord).map((variant) => ({
+      id: Number(variant.id), sku: String(variant.sku ?? ''),
+      option1_name: String(variant.option1_name ?? ''), option1_value: String(variant.option1_value ?? ''),
+      option2_name: String(variant.option2_name ?? ''), option2_value: String(variant.option2_value ?? ''),
+      option3_name: String(variant.option3_name ?? ''), option3_value: String(variant.option3_value ?? ''),
+      price: Number(variant.price ?? 0), inventory_qty: Number(variant.inventory_qty ?? 0),
+      image: String(variant.image ?? ''), is_active: variant.is_active !== false,
+    })) : []
+  const images = isRecord(payload) && Array.isArray(payload.images)
+    ? payload.images.filter(isRecord).map((image) => ({
+      id: Number(image.id), image_url: String(image.image_url ?? ''),
+      alt_text: String(image.alt_text ?? ''), position: Number(image.position ?? 0),
+    })) : []
 
   if (id === null || !resolvedName || price === null || stock === null) {
     return null
@@ -292,30 +337,58 @@ function parseCatalogProduct(payload: unknown): CatalogProduct | null {
     categoryLabel: category.categoryLabel,
     imageUrl,
     tags,
+    variants,
+    images,
   }
 }
 
 // El listado publico de productos se consume sin autenticacion para la portada.
-export async function fetchPublicCatalogProducts() {
-  const response = await fetch(`${API_BASE_URL}/products/`, {
-    headers: {
-      Accept: 'application/json',
-    },
+export async function fetchPublicCatalogProducts(params: {
+  search?: string
+  category?: string
+  ordering?: string
+  page?: number
+  min_price?: string
+  max_price?: string
+} = {}): Promise<CatalogPage> {
+  const query = new URLSearchParams()
+  query.set('page_size', '48')
+  Object.entries(params).forEach(([key, value]) => {
+    if (value) query.set(key, String(value))
   })
+  const rawProducts: unknown[] = []
+  let nextUrl: string | null = `${API_BASE_URL}/products/?${query.toString()}`
+  let totalCount = 0
 
-  if (!response.ok) {
-    throw new Error('No se pudo cargar el catalogo publico desde el backend.')
+  while (nextUrl) {
+    const response = await fetch(nextUrl, { headers: { Accept: 'application/json' } })
+
+    if (!response.ok) {
+      throw new Error('No se pudo cargar el catalogo publico desde el backend.')
+    }
+
+    const payload = (await response.json().catch(() => [])) as unknown
+    const paginated = isRecord(payload) && Array.isArray(payload.results)
+    const pageProducts = Array.isArray(payload) ? payload : paginated ? payload.results : []
+    rawProducts.push(...pageProducts)
+    totalCount = paginated && typeof payload.count === 'number' ? payload.count : rawProducts.length
+    nextUrl = paginated && typeof payload.next === 'string' ? payload.next : null
   }
 
-  const payload = (await response.json().catch(() => [])) as unknown
-  const rawProducts =
-    Array.isArray(payload)
-      ? payload
-      : isRecord(payload) && Array.isArray(payload.results)
-        ? payload.results
-        : []
-
-  return rawProducts
+  return {
+    products: rawProducts
     .map((product) => parseCatalogProduct(product))
-    .filter((product): product is CatalogProduct => product !== null)
+    .filter((product): product is CatalogProduct => product !== null),
+    count: totalCount,
+    next: null,
+    previous: null,
+  }
+}
+
+export async function fetchPublicProduct(handle: string): Promise<CatalogProduct> {
+  const response = await fetch(`${API_BASE_URL}/products/by-handle/${encodeURIComponent(handle)}/`, { headers: { Accept: 'application/json' } })
+  if (!response.ok) throw new Error('No se pudo cargar el producto solicitado.')
+  const product = parseCatalogProduct(await response.json())
+  if (!product) throw new Error('El producto recibido no tiene datos válidos.')
+  return product
 }

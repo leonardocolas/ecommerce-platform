@@ -12,6 +12,7 @@ export default function AdminProducts() {
   const [products, setProducts] = useState<AdminProduct[]>([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
 
   const [showForm, setShowForm] = useState(false)
@@ -21,7 +22,13 @@ export default function AdminProducts() {
   const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
-    adminProductApi.list().then(setProducts).finally(() => setLoading(false))
+    adminProductApi.list()
+      .then((data) => {
+        setProducts(data)
+        setLoadError(null)
+      })
+      .catch(() => setLoadError('No se pudieron cargar los productos.'))
+      .finally(() => setLoading(false))
   }, [])
 
   const filtered = useMemo(() => {
@@ -113,6 +120,10 @@ export default function AdminProducts() {
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
           <p className="text-sm">Cargando productos...</p>
+        </div>
+      ) : loadError ? (
+        <div className="rounded-xl border border-red-100 bg-red-50 py-12 text-center">
+          <p className="text-sm text-red-700">{loadError}</p>
         </div>
       ) : paginated.length === 0 ? (
         <div className="rounded-xl border border-slate-100 bg-white py-12 text-center shadow-sm">

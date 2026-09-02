@@ -84,6 +84,7 @@ export default function LoginPage() {
           error={error}
           fields={loginFields}
         />
+        <p className="text-center text-sm"><a href="/forgot-password" className="font-semibold text-amber-700 hover:underline">¿Olvidaste tu contraseña?</a></p>
       </div>
     </AuthPageLayout>
   )

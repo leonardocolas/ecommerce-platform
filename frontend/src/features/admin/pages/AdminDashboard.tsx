@@ -73,14 +73,16 @@ export default function AdminDashboard() {
   const [period, setPeriod] = useState('all')
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   const fetchStats = useCallback(async () => {
     setLoading(true)
     try {
       const data = await adminDashboardApi.stats(period)
       setStats(data)
+      setError(null)
     } catch {
-      // silent
+      setError('No se pudieron cargar las estadisticas. Comprueba la sesion y vuelve a intentarlo.')
     } finally {
       setLoading(false)
     }
@@ -119,8 +121,16 @@ export default function AdminDashboard() {
           </svg>
           <p className="text-sm">Cargando estadisticas...</p>
         </div>
+      ) : error && !stats ? (
+        <div className="rounded-xl border border-red-100 bg-red-50 px-6 py-10 text-center">
+          <p className="text-sm text-red-700">{error}</p>
+          <button onClick={() => void fetchStats()} className="mt-4 rounded-lg bg-slate-950 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800">
+            Reintentar
+          </button>
+        </div>
       ) : stats ? (
         <>
+          {error ? <p className="mb-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">{error} Mostrando los ultimos datos disponibles.</p> : null}
           {/* Summary Cards */}
           <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard

@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
+from .models import SavedAddress
 from django.contrib.auth.password_validation import validate_password
 
 User = get_user_model()
@@ -46,3 +47,17 @@ class UserAdminSerializer(serializers.ModelSerializer):
         if hasattr(obj, 'order_set'):
             return obj.order_set.count()
         return 0
+
+
+class ProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'role']
+        read_only_fields = ['id', 'username', 'role']
+
+
+class SavedAddressSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SavedAddress
+        fields = ['id', 'label', 'recipient_name', 'address', 'city', 'state', 'postal_code', 'country', 'is_default', 'created_at']
+        read_only_fields = ['id', 'created_at']

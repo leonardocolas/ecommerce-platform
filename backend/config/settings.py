@@ -158,3 +158,23 @@ CORS_ALLOWED_ORIGINS = [
     for origin in os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:5173,http://localhost:3000').split(',')
     if origin.strip()
 ]
+
+BANK_TRANSFER_DETAILS = {
+    'holder': os.getenv('BANK_ACCOUNT_HOLDER', 'Tienda Demo S.L.'),
+    'bank': os.getenv('BANK_NAME', 'Banco Demo'),
+    'iban': os.getenv('BANK_IBAN', 'ESXX XXXX XXXX XXXX XXXX XXXX'),
+}
+
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'pedidos@example.com')
+EMAIL_BACKEND = os.getenv(
+    'EMAIL_BACKEND',
+    'django.core.mail.backends.console.EmailBackend' if DEBUG
+    else 'django.core.mail.backends.smtp.EmailBackend',
+)
+EMAIL_HOST = os.getenv('EMAIL_HOST', '')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+EMAIL_USE_TLS = env_bool('EMAIL_USE_TLS', True)
+TAX_RATE = os.getenv('TAX_RATE', '0.00')
+SHIPPING_FLAT_RATE = os.getenv('SHIPPING_FLAT_RATE', '0.00')

@@ -1,4 +1,5 @@
 from rest_framework.permissions import BasePermission
+from users.permissions import is_admin_user
 
 
 class IsProviderOrAdmin(BasePermission):
@@ -7,7 +8,7 @@ class IsProviderOrAdmin(BasePermission):
     def has_permission(self, request, view):
         return (
             request.user.is_authenticated
-            and request.user.role in ['PROVIDER', 'ADMIN', 'STAFF']
+            and (request.user.role == 'PROVIDER' or is_admin_user(request.user))
         )
 
 
@@ -17,5 +18,5 @@ class IsOwnerOrAdmin(BasePermission):
     def has_object_permission(self, request, view, obj):
         return (
             obj.provider == request.user
-            or request.user.role in ['ADMIN', 'STAFF']
+            or is_admin_user(request.user)
         )

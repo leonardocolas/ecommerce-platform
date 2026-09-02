@@ -28,6 +28,7 @@ function getMinLength(fieldName: AuthFieldName) {
 
 export default function AuthForm({ onSubmit, submitLabel, error, fields }: AuthFormProps) {
   const [loading, setLoading] = useState(false)
+  const [visibleFields, setVisibleFields] = useState<Set<string>>(new Set())
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -51,18 +52,36 @@ export default function AuthForm({ onSubmit, submitLabel, error, fields }: AuthF
           <label htmlFor={field.name} className="mb-2 block text-sm font-medium text-slate-700">
             {field.label}
           </label>
-          <input
-            type={field.type}
-            id={field.name}
-            name={field.name}
-            required
-            minLength={getMinLength(field.name)}
-            autoComplete={field.autoComplete}
-            autoCapitalize="none"
-            spellCheck={false}
-            className="block w-full rounded-2xl border border-slate-200 bg-stone-50 px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-100"
-            placeholder={field.placeholder}
-          />
+          <div className="relative">
+            <input
+              type={field.type === 'password' && !visibleFields.has(field.name) ? 'password' : field.type === 'password' ? 'text' : field.type}
+              id={field.name}
+              name={field.name}
+              required
+              minLength={getMinLength(field.name)}
+              autoComplete={field.autoComplete}
+              autoCapitalize="none"
+              spellCheck={false}
+              className="block w-full rounded-2xl border border-slate-200 bg-stone-50 px-4 py-3 pr-12 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-100"
+              placeholder={field.placeholder}
+            />
+            {field.type === 'password' ? (
+              <button
+                type="button"
+                aria-label={visibleFields.has(field.name) ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                title={visibleFields.has(field.name) ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                onClick={() => setVisibleFields((current) => {
+                  const next = new Set(current)
+                  if (next.has(field.name)) next.delete(field.name)
+                  else next.add(field.name)
+                  return next
+                })}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-slate-500 hover:text-slate-950"
+              >
+                {visibleFields.has(field.name) ? '◉' : '◌'}
+              </button>
+            ) : null}
+          </div>
           {field.helperText ? (
             <p className="mt-2 text-xs leading-5 text-slate-500">{field.helperText}</p>
           ) : null}

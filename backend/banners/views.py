@@ -1,5 +1,6 @@
 from rest_framework import viewsets, permissions
 from rest_framework.response import Response
+from users.permissions import IsStaffOrAdminRole
 from .models import Banner
 from .serializers import BannerSerializer, BannerPublicSerializer
 
@@ -11,15 +12,15 @@ class BannerViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
             return [permissions.AllowAny()]
-        return [permissions.IsAdminUser()]
+        return [IsStaffOrAdminRole()]
 
     def get_serializer_class(self):
-        if self.action in ['list', 'retrieve'] and not self.request.user.is_staff:
+        if self.action in ['list', 'retrieve'] and self.request.user.role not in ['ADMIN', 'STAFF']:
             return BannerPublicSerializer
         return BannerSerializer
 
     def list(self, request, *args, **kwargs):
-        if request.user.is_staff:
+        if request.user.role in ['ADMIN', 'STAFF']:
             return super().list(request, *args, **kwargs)
         queryset = self.get_queryset().filter(is_active=True)
         page = self.paginate_queryset(queryset)

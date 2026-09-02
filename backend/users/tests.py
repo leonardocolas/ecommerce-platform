@@ -1,9 +1,23 @@
 from django.contrib.auth import get_user_model
-from rest_framework import status
 from rest_framework.test import APITestCase
+from rest_framework import status
 
 
 User = get_user_model()
+
+
+class SuperuserAccessTests(APITestCase):
+    def test_superuser_login_is_returned_as_admin(self):
+        User.objects.create_superuser(
+            username='superadmin', password='ClaveSegura123!', email='admin@example.com',
+        )
+
+        response = self.client.post('/api/auth/login/', {
+            'username': 'superadmin', 'password': 'ClaveSegura123!',
+        }, format='json')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['user']['role'], 'ADMIN')
 
 
 class RegisterViewTests(APITestCase):

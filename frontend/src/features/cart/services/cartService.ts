@@ -31,6 +31,7 @@ export interface CartItemData {
   product_stock: number
   quantity: number
   subtotal: number
+  variant_id: number | null
 }
 
 export interface CartState {
@@ -45,7 +46,7 @@ export interface CartState {
   updatingProductIds: Set<number>
 
   fetchCart: () => Promise<void>
-  addItem: (productId: number, quantity?: number) => Promise<void>
+  addItem: (productId: number, quantity?: number, variantId?: number) => Promise<void>
   removeItem: (itemId: number, productId?: number) => Promise<void>
   updateQuantity: (itemId: number, quantity: number) => Promise<void>
   changeProductQuantity: (productId: number, delta: number) => Promise<void>
@@ -111,7 +112,7 @@ export const useCartStore = create<CartState>((set, get) => ({
   },
 
   // ── addItem — actualiza estado local, sin re-fetch ────────────────────────
-  addItem: async (productId, quantity = 1) => {
+  addItem: async (productId, quantity = 1, variantId) => {
     const { addingProductIds } = get()
     if (addingProductIds.has(productId)) return
 
@@ -120,7 +121,7 @@ export const useCartStore = create<CartState>((set, get) => ({
     try {
       const raw = await apiFetch('/cart/items/add/', {
         method: 'POST',
-        body: JSON.stringify({ product_id: productId, quantity }),
+        body: JSON.stringify({ product_id: productId, quantity, ...(variantId ? { variant_id: variantId } : {}) }),
       })
       // El servidor devuelve el CartItem actualizado — lo aplicamos localmente
       const serverItem = raw as CartItemData

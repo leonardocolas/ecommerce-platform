@@ -10,7 +10,6 @@ import FeaturedProducts from '../components/FeaturedProducts'
 import Hero from '../components/Hero'
 import ProductCard from '../components/ProductCard'
 import SaleProducts from '../components/SaleProducts'
-import { fallbackProducts } from '../data/fallbackProducts'
 import { fetchPublicCatalogProducts, type CatalogProduct } from '../services/productCatalog'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -72,7 +71,7 @@ export default function HomePage() {
   const { user } = useAuth()
   const currentPath = `${location.pathname}${location.search}` || '/'
   const catalogSectionRef = useRef<HTMLElement | null>(null)
-  const [products, setProducts] = useState<CatalogProduct[]>(fallbackProducts)
+  const [products, setProducts] = useState<CatalogProduct[]>([])
   const [catalogMessage, setCatalogMessage] = useState<string | null>(null)
   const [isCatalogLoading, setIsCatalogLoading] = useState(true)
   const [interactionMessage, setInteractionMessage] = useState<string | null>(null)
@@ -84,29 +83,29 @@ export default function HomePage() {
 
     async function loadCatalog() {
       try {
-        const backendProducts = await fetchPublicCatalogProducts()
+        const backendProducts = await fetchPublicCatalogProducts({ page: 1 })
 
         if (!isMounted) {
           return
         }
 
-        if (backendProducts.length > 0) {
-          setProducts(backendProducts)
-          setCatalogMessage('Catalogo cargado desde el backend.')
+        if (backendProducts.products.length > 0) {
+          setProducts(backendProducts.products)
+          setCatalogMessage(`Catalogo activo cargado: ${backendProducts.products.length} productos.`)
         } else {
-          setProducts(fallbackProducts)
-          setCatalogMessage('Aun no hay productos publicados. Mostramos una portada demo.')
+          setProducts([])
+          setCatalogMessage('No hay productos activos publicados en este momento.')
         }
       } catch (errorValue: unknown) {
         if (!isMounted) {
           return
         }
 
-        setProducts(fallbackProducts)
+        setProducts([])
         setCatalogMessage(
           errorValue instanceof Error
-            ? `${errorValue.message} Mostramos un catalogo demo mientras tanto.`
-            : 'No pudimos cargar el catalogo real. Mostramos un catalogo demo mientras tanto.',
+            ? errorValue.message
+            : 'No pudimos cargar el catalogo activo.',
         )
       } finally {
         if (isMounted) {

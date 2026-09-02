@@ -1,9 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { AdminProduct } from '../services/adminService'
 
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'USD' }).format(value)
-}
 
 function generateHandle(title: string): string {
   return title

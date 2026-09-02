@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { createOrder } from '../orders/services/orderService'
-import { createPayment, simulatePayment } from './paymentService'
 import { useCartStore } from '../cart/services/cartService'
+import { downloadOrderProforma } from '../orders/services/orderService'
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
@@ -100,10 +100,17 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
   const [processingLabel, setProcessingLabel] = useState('')
   const [stepsState, setStepsState] = useState<StepInfo[]>([
     { label: 'Crear orden', done: false, active: false },
-    { label: 'Procesar pago', done: false, active: false },
+    { label: 'Generar proforma', done: false, active: false },
   ])
   const [createdOrderId, setCreatedOrderId] = useState<number | null>(null)
+  const [createdOrder, setCreatedOrder] = useState<Awaited<ReturnType<typeof createOrder>> | null>(null)
   const [errorMessage, setErrorMessage] = useState('')
+  const [customer, setCustomer] = useState({
+    customer_name: '',
+    tax_id: '',
+    shipping_address: '',
+    customer_email: '',
+  })
 
   function markStep(index: number, done: boolean, nextActive: boolean) {
     setStepsState((prev) =>
@@ -126,13 +133,15 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
 
     let orderId: number
     try {
-      const orderPayload = items.map((item) => ({
-        product: item.product_id,
-        quantity: item.quantity,
-      }))
-      const order = await createOrder(orderPayload)
+        const orderPayload = items.map((item) => ({
+          product: item.product_id,
+          quantity: item.quantity,
+          variant: item.variant_id,
+        }))
+        const order = await createOrder(orderPayload, customer)
       orderId = order.id
       setCreatedOrderId(orderId)
+        setCreatedOrder(order)
       markStep(0, true, true)
     } catch (err) {
       setErrorMessage((err as Error).message || 'Error al crear la orden')
@@ -140,25 +149,15 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
       return
     }
 
-    // ── Paso 2: Procesar pago ────────────────────────────────────────────────
-    setProcessingLabel('Procesando el pago...')
-    try {
-      const { payment_id } = await createPayment(orderId)
-      const result = await simulatePayment(payment_id)
+    setProcessingLabel('Guardando la proforma...')
+    markStep(1, true, false)
+    setStep('success')
+    await clearCart()
+  }
 
-      markStep(1, true, false)
-
-      if (result.status === 'SUCCESS') {
-        setStep('success')
-        await clearCart()
-      } else {
-        setErrorMessage('El pago fue rechazado. Tu orden ha sido cancelada y el stock restituido.')
-        setStep('failed')
-      }
-    } catch (err) {
-      setErrorMessage((err as Error).message || 'Error al procesar el pago')
-      setStep('failed')
-    }
+  async function downloadInvoice() {
+    if (!createdOrder) return
+    await downloadOrderProforma(createdOrder.id)
   }
 
   function handleGoToOrder() {
@@ -179,6 +178,7 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
     setStep('confirm')
     setErrorMessage('')
     setCreatedOrderId(null)
+    setCreatedOrder(null)
     setStepsState([
       { label: 'Crear orden', done: false, active: false },
       { label: 'Procesar pago', done: false, active: false },
@@ -192,8 +192,15 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
         <div className="p-6">
           <h2 className="mb-1 text-xl font-bold text-slate-950">Confirmar pedido</h2>
           <p className="mb-6 text-sm text-slate-500">
-            Revisa tu pedido antes de proceder al pago.
+            Completa tus datos para generar la factura proforma y recibir las instrucciones de transferencia.
           </p>
+
+          <div className="mb-5 grid gap-3 sm:grid-cols-2">
+            <input required placeholder="Nombre completo" value={customer.customer_name} onChange={(e) => setCustomer({ ...customer, customer_name: e.target.value })} className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-amber-400 focus:outline-none" />
+            <input required placeholder="NIF/CIF" value={customer.tax_id} onChange={(e) => setCustomer({ ...customer, tax_id: e.target.value })} className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-amber-400 focus:outline-none" />
+            <input required type="email" placeholder="Email" value={customer.customer_email} onChange={(e) => setCustomer({ ...customer, customer_email: e.target.value })} className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-amber-400 focus:outline-none sm:col-span-2" />
+            <textarea required placeholder="Dirección de entrega" value={customer.shipping_address} onChange={(e) => setCustomer({ ...customer, shipping_address: e.target.value })} className="min-h-20 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-amber-400 focus:outline-none sm:col-span-2" />
+          </div>
 
           {/* Lista de items */}
           <div className="mb-4 max-h-52 overflow-y-auto space-y-2 pr-1">
@@ -225,12 +232,12 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
           <div className="rounded-xl bg-slate-50 p-4 space-y-2">
             <div className="flex justify-between border-t border-slate-200 pt-2 text-base font-bold text-slate-950">
               <span>Total a pagar</span>
-              <span>{formatCurrency(total)}</span>
+              <span>{formatCurrency(finalTotal)}</span>
             </div>
           </div>
 
           <p className="mt-4 rounded-lg bg-amber-50 px-4 py-3 text-xs text-amber-700 border border-amber-200">
-            El pago es simulado. Hay un 50% de probabilidad de éxito o rechazo.
+            El pedido quedará pendiente de pago hasta que confirmemos tu transferencia.
           </p>
 
           <div className="mt-6 flex gap-3">
@@ -244,7 +251,7 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
               onClick={handleConfirm}
               className="flex-1 rounded-full bg-amber-400 py-3 text-sm font-semibold text-slate-950 transition hover:bg-amber-300"
             >
-              Confirmar y pagar
+              Generar pedido
             </button>
           </div>
         </div>
@@ -276,19 +283,28 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
           <div className="mb-4 text-green-500">
             <IconCheck />
           </div>
-          <h2 className="mb-2 text-2xl font-bold text-slate-950">¡Pago exitoso!</h2>
-          <p className="mb-2 text-slate-500">Tu pedido fue confirmado correctamente.</p>
+          <h2 className="mb-2 text-2xl font-bold text-slate-950">¡Pedido recibido!</h2>
+          <p className="mb-2 text-slate-500">Tu factura proforma está lista. El pedido queda pendiente de pago.</p>
           {createdOrderId && (
             <p className="mb-6 text-sm font-medium text-slate-700">
-              Orden <span className="font-bold text-slate-950">#{createdOrderId}</span>
+              Factura <span className="font-bold text-slate-950">{createdOrder?.invoice_number}</span>
             </p>
           )}
           <div className="mb-2 rounded-xl bg-slate-50 px-6 py-3">
-            <p className="text-sm text-slate-500">Total cobrado</p>
+            <p className="text-sm text-slate-500">Total a transferir</p>
             <p className="text-2xl font-bold text-slate-950">{formatCurrency(finalTotal)}</p>
           </div>
+          <div className="mt-4 w-full rounded-xl border border-amber-200 bg-amber-50 p-4 text-left text-sm text-slate-700">
+            <p className="font-semibold text-slate-950">Instrucciones de pago</p>
+            <p className="mt-2">Realiza la transferencia a esta cuenta:</p>
+            <p className="mt-1 text-xs text-slate-600">Titular: {createdOrder?.bank_transfer_details.holder}</p>
+            <p className="text-xs text-slate-600">Banco: {createdOrder?.bank_transfer_details.bank}</p>
+            <p className="text-xs text-slate-600">IBAN: {createdOrder?.bank_transfer_details.iban}</p>
+            <p className="mt-2 text-xs text-slate-500">Concepto: {createdOrder?.invoice_number}. Fecha límite: {createdOrder?.payment_due_at ? new Date(createdOrder.payment_due_at).toLocaleDateString('es-ES') : 'Pendiente'}.</p>
+          </div>
 
-          <div className="mt-6 flex w-full gap-3">
+          <div className="mt-6 flex w-full flex-wrap gap-3">
+            <button onClick={downloadInvoice} className="w-full rounded-full bg-amber-400 py-3 text-sm font-semibold text-slate-950 transition hover:bg-amber-300">Descargar Factura PDF</button>
             <button
               onClick={onClose}
               className="flex-1 rounded-full border border-slate-200 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"

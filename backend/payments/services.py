@@ -1,20 +1,33 @@
+from django.db import transaction
+
+from orders.inventory import release_order_stock_once
+from orders.models import OrderAudit
+
+
+@transaction.atomic
 def handle_payment_webhook(payment):
     order = payment.order
 
     if payment.status == 'SUCCESS':
-        order.status = 'PAID'
-        order.save(update_fields=['status'])
+        if order.status == 'AWAITING_PAYMENT':
+            order.status = 'PAID'
+            order.save(update_fields=['status'])
+            OrderAudit.objects.create(
+                order=order, actor=None, action='PAYMENT_SUCCEEDED',
+                from_status='AWAITING_PAYMENT', to_status='PAID',
+            )
         return
 
     if payment.status == 'FAILED':
         if order.status == 'AWAITING_PAYMENT':
-            for item in order.items.select_related('product'):
-                product = item.product
-                product.variant_inventory_qty += item.quantity
-                product.save(update_fields=['variant_inventory_qty'])
+            release_order_stock_once(order, reason='PAYMENT_FAILURE')
 
-        order.status = 'CANCELED'
-        order.save(update_fields=['status'])
+            order.status = 'CANCELED'
+            order.save(update_fields=['status'])
+            OrderAudit.objects.create(
+                order=order, actor=None, action='PAYMENT_FAILED',
+                from_status='AWAITING_PAYMENT', to_status='CANCELED',
+            )
         return
 
     order.save(update_fields=['status'])

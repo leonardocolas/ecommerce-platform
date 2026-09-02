@@ -49,7 +49,7 @@ class PaymentFlowTests(APITestCase):
             order=order,
             product=self.product,
             quantity=2,
-            price=self.product.price,
+            price=self.product.variant_price,
         )
         self.product.variant_inventory_qty -= 2
         self.product.save(update_fields=['variant_inventory_qty'])
@@ -136,3 +136,31 @@ class PaymentFlowTests(APITestCase):
         with self.assertRaises(IntegrityError):
             with transaction.atomic():
                 Payment.objects.create(order=order, status='INITIATED', amount=order.total)
+
+    def test_manual_proof_can_be_rejected_and_cannot_be_overwritten(self):
+        admin = User.objects.create_user(
+            username='admin_comprobante', password='ClaveSegura123!', role='ADMIN', is_staff=True,
+        )
+        order = self.create_order_with_reserved_stock()
+        order.status = 'AWAITING_PAYMENT'
+        order.save(update_fields=['status'])
+        self.client.force_authenticate(user=self.customer)
+
+        response = self.client.post(
+            f'/api/payments/proof/{order.id}/',
+            {'proof_reference': 'TRX-001', 'proof_note': 'Transferencia'}, format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        duplicate = self.client.post(
+            f'/api/payments/proof/{order.id}/',
+            {'proof_reference': 'TRX-002'}, format='json',
+        )
+        self.assertEqual(duplicate.status_code, status.HTTP_400_BAD_REQUEST)
+
+        self.client.force_authenticate(user=admin)
+        review = self.client.post(
+            f'/api/payments/proof/{order.id}/review/',
+            {'decision': 'REJECT', 'note': 'Referencia no válida'}, format='json',
+        )
+        self.assertEqual(review.status_code, status.HTTP_200_OK)
+        self.assertEqual(review.data['status'], 'REJECTED')

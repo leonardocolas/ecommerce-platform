@@ -3,9 +3,12 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-route
 
 import HomePage from '../features/storefront/pages/HomePage'
 import ProductsPage from '../features/products/pages/ProductsPage'
+import ProductDetailPage from '../features/products/pages/ProductDetailPage'
 import CartPage from '../features/cart/pages/CartPage'
 import LoginPage from '../features/auth/pages/LoginPage'
 import RegisterPage from '../features/auth/pages/RegisterPage'
+import ForgotPasswordPage from '../features/auth/pages/ForgotPasswordPage'
+import ProfilePage from '../features/auth/pages/ProfilePage'
 import OrderHistoryPage from '../features/orders/pages/OrderHistoryPage'
 import OrderDetailPage from '../features/orders/pages/OrderDetailPage'
 import {
@@ -100,7 +103,10 @@ export default function AppRouter() {
               </GuestOnlyRoute>
             }
           />
+          <Route path="/forgot-password" element={<GuestOnlyRoute><ForgotPasswordPage /></GuestOnlyRoute>} />
+          <Route path="/profile" element={<ProfilePage />} />
           <Route path="/products" element={<ProductsPage />} />
+          <Route path="/products/:handle" element={<ProductDetailPage />} />
           <Route path="/cart" element={<CartPage />} />
           <Route path="/orders" element={<OrderHistoryPage />} />
           <Route path="/orders/:id" element={<OrderDetailPage />} />

@@ -1,15 +1,21 @@
-from django.contrib.auth import authenticate
-from django.contrib.auth import get_user_model
+from django.contrib.auth import authenticate, get_user_model
+from django.contrib.auth.tokens import default_token_generator
+from django.conf import settings
+from django.core.mail import send_mail
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.encoding import force_bytes
 from django.db import models
 from rest_framework import generics, status, viewsets, permissions
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated, IsAdminUser
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 
-from .serializers import LoginSerializer, RegisterSerializer, UserAdminSerializer
+from .serializers import LoginSerializer, RegisterSerializer, UserAdminSerializer, ProfileSerializer, SavedAddressSerializer
+from .models import SavedAddress
+from .permissions import IsStaffOrAdminRole
 
 User = get_user_model()
 
@@ -40,7 +46,7 @@ class LoginView(APIView):
             'user': {
                 'id': user.id,
                 'username': user.username,
-                'role': user.role,
+                'role': 'ADMIN' if user.is_superuser else user.role,
                 'email': user.email,
             },
             'access': str(refresh.access_token),
@@ -66,10 +72,73 @@ class LogoutView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+class ProfileView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response(ProfileSerializer(request.user).data)
+
+    def patch(self, request):
+        serializer = ProfileSerializer(request.user, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+
+class PasswordResetRequestView(APIView):
+    def post(self, request):
+        email = request.data.get('email', '').strip()
+        user = User.objects.filter(email__iexact=email, is_active=True).first()
+        if user:
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
+            token = default_token_generator.make_token(user)
+            send_mail(
+                'Recupera tu contraseña',
+                f'Usa este enlace para establecer una nueva contraseña: {request.build_absolute_uri(f"/reset-password/{uid}/{token}/")}',
+                settings.DEFAULT_FROM_EMAIL,
+                [user.email],
+                fail_silently=True,
+            )
+        return Response({'message': 'Si el correo existe, recibirás instrucciones para recuperar tu cuenta.'})
+
+
+class PasswordResetConfirmView(APIView):
+    def post(self, request, uid, token):
+        try:
+            user = User.objects.get(pk=urlsafe_base64_decode(uid).decode())
+        except (User.DoesNotExist, ValueError, TypeError, OverflowError):
+            return Response({'error': 'El enlace de recuperación no es válido.'}, status=400)
+        if not default_token_generator.check_token(user, token):
+            return Response({'error': 'El enlace de recuperación ha expirado.'}, status=400)
+        password = request.data.get('password', '')
+        from django.contrib.auth.password_validation import validate_password
+        from django.core.exceptions import ValidationError
+        try:
+            validate_password(password, user)
+        except ValidationError as error:
+            return Response({'error': ' '.join(error.messages)}, status=400)
+        user.set_password(password)
+        user.save(update_fields=['password'])
+        return Response({'message': 'Contraseña actualizada correctamente.'})
+
+
+class SavedAddressViewSet(viewsets.ModelViewSet):
+    serializer_class = SavedAddressSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return SavedAddress.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        if serializer.validated_data.get('is_default'):
+            self.get_queryset().update(is_default=False)
+        serializer.save(user=self.request.user)
+
+
 class UserAdminViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all().order_by('-date_joined')
     serializer_class = UserAdminSerializer
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsStaffOrAdminRole]
 
     def get_queryset(self):
         qs = super().get_queryset()

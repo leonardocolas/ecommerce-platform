@@ -125,7 +125,9 @@ export default function ProductCard({
       <div className="flex flex-1 flex-col p-6">
         <div>
           <p className="text-xs uppercase tracking-[0.24em] text-slate-500">{providerName}</p>
-          <h3 className="mt-3 text-2xl font-semibold text-slate-950">{product.name}</h3>
+          <Link to={`/products/${product.slug}`} className="mt-3 block text-2xl font-semibold text-slate-950 hover:text-amber-600">
+            {product.name}
+          </Link>
         </div>
 
         <p className="mt-4 text-sm leading-6 text-slate-600">{product.description}</p>

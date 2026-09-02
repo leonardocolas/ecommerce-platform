@@ -42,16 +42,18 @@ class CartViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
 
         product = serializer.validated_data['product_id']
+        variant = serializer.validated_data.get('variant_id')
         quantity = serializer.validated_data['quantity']
 
         with transaction.atomic():
             item, created = CartItem.objects.get_or_create(
-                cart=cart, product=product,
+                cart=cart, product=product, variant=variant,
                 defaults={'quantity': quantity}
             )
             if not created:
                 new_qty = item.quantity + quantity
-                if new_qty > product.variant_inventory_qty:
+                stock = variant.inventory_qty if variant else product.variant_inventory_qty
+                if new_qty > stock:
                     return Response(
                         {'error': f"Stock insuficiente. Disponible: {product.variant_inventory_qty}."},
                         status=400
@@ -82,7 +84,8 @@ class CartViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
 
         quantity = serializer.validated_data['quantity']
-        if quantity > item.product.variant_inventory_qty:
+        stock = item.variant.inventory_qty if item.variant else item.product.variant_inventory_qty
+        if quantity > stock:
             return Response(
                 {'error': f"Stock insuficiente. Disponible: {item.product.variant_inventory_qty}."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -108,14 +111,15 @@ class CartViewSet(viewsets.GenericViewSet):
             return Response(CartSerializer(user_cart).data)
 
         with transaction.atomic():
-            for anon_item in anon_cart.items.select_related('product'):
+            for anon_item in anon_cart.items.select_related('product', 'variant'):
                 user_item, created = CartItem.objects.get_or_create(
-                    cart=user_cart, product=anon_item.product,
+                    cart=user_cart, product=anon_item.product, variant=anon_item.variant,
                     defaults={'quantity': anon_item.quantity}
                 )
                 if not created:
                     new_qty = user_item.quantity + anon_item.quantity
-                    if new_qty <= anon_item.product.variant_inventory_qty:
+                    stock = anon_item.variant.inventory_qty if anon_item.variant else anon_item.product.variant_inventory_qty
+                    if new_qty <= stock:
                         user_item.quantity = new_qty
                         user_item.save(update_fields=['quantity'])
 

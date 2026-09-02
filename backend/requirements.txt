@@ -1,4 +1,5 @@
 asgiref==3.11.1
+reportlab==4.4.9
 Django==6.0.3
 django-cors-headers==4.7.0
 djangorestframework==3.17.1

@@ -7,9 +7,11 @@ from django.utils import timezone
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from django.conf import settings
 
 from orders.models import Order, OrderItem
 from products.models import Product
+from users.permissions import is_admin_user
 
 User = get_user_model()
 
@@ -33,7 +35,7 @@ class DashboardStatsView(APIView):
 
     def get(self, request):
         user = request.user
-        if user.role not in ['ADMIN', 'STAFF']:
+        if not is_admin_user(user):
             return Response({'error': 'No tienes permisos'}, status=403)
 
         period = request.query_params.get('period', 'all')
@@ -49,7 +51,7 @@ class DashboardStatsView(APIView):
             users_qs = users_qs.filter(date_joined__gte=period_start)
             order_items_qs = order_items_qs.filter(order__created_at__gte=period_start)
 
-        paid_orders = orders_qs.filter(status='PAID')
+        paid_orders = orders_qs.filter(status__in=['PAID', 'PROCESSING', 'SHIPPED'])
 
         # ── Summary stats ──────────────────────────────────────────────────────
         total_revenue = paid_orders.aggregate(total=Sum('total'))['total'] or 0
@@ -80,19 +82,19 @@ class DashboardStatsView(APIView):
             order_items_qs
             .filter(order__status='PAID')
             .values(
-                product_id=F('product__id'),
+                product_pk=F('product__id'),
                 title=F('product__title'),
                 image=F('product__image_src'),
             )
             .annotate(
-                total_sold=Count('id'),
+                total_sold=Sum('quantity'),
                 total_revenue=Sum(F('price') * F('quantity')),
             )
-            .order_by('-total_sold')[:10]
+            .order_by('-total_sold')[:int(request.query_params.get('top_products_limit', 10))]
         )
         top_products_list = [
             {
-                'id': item['product_id'],
+                'id': item['product_pk'],
                 'title': item['title'],
                 'image': item['image'],
                 'total_sold': item['total_sold'],
@@ -139,4 +141,18 @@ class DashboardStatsView(APIView):
             'top_products': top_products_list,
             'customers_chart': customers_chart,
             'status_chart': status_chart,
+        })
+
+
+class OperationsConfigView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not is_admin_user(request.user):
+            return Response({'error': 'No tienes permisos'}, status=403)
+        return Response({
+            'bank_transfer': settings.BANK_TRANSFER_DETAILS,
+            'tax_rate': settings.TAX_RATE,
+            'shipping_flat_rate': settings.SHIPPING_FLAT_RATE,
+            'payment_method': 'MANUAL_BANK_TRANSFER',
         })
