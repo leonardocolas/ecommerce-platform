@@ -15,12 +15,19 @@ class BannerViewSet(viewsets.ModelViewSet):
         return [IsStaffOrAdminRole()]
 
     def get_serializer_class(self):
-        if self.action in ['list', 'retrieve'] and self.request.user.role not in ['ADMIN', 'STAFF']:
+        if self.action in ['list', 'retrieve'] and not self._is_staff_or_admin():
             return BannerPublicSerializer
         return BannerSerializer
 
+    def _is_staff_or_admin(self):
+        user = self.request.user
+        if not user.is_authenticated:
+            return False
+        role = getattr(user, 'role', None)
+        return user.is_superuser or role in ['ADMIN', 'STAFF']
+
     def list(self, request, *args, **kwargs):
-        if request.user.role in ['ADMIN', 'STAFF']:
+        if self._is_staff_or_admin():
             return super().list(request, *args, **kwargs)
         queryset = self.get_queryset().filter(is_active=True)
         page = self.paginate_queryset(queryset)

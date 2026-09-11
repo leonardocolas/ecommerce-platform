@@ -15,8 +15,13 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'password', 'role']
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'password', 'role']
         read_only_fields = ['id', 'role']
+        extra_kwargs = {
+            'email': {'required': True, 'allow_blank': False},
+            'first_name': {'required': True, 'allow_blank': False},
+            'last_name': {'required': True, 'allow_blank': False},
+        }
 
     def create(self, validated_data):
         validated_data.pop('role', None)
@@ -24,6 +29,8 @@ class RegisterSerializer(serializers.ModelSerializer):
         user = User.objects.create_user(
             username=validated_data['username'],
             email=validated_data.get('email'),
+            first_name=validated_data['first_name'],
+            last_name=validated_data['last_name'],
             password=validated_data['password'],
             role='USER'
         )
@@ -52,8 +59,13 @@ class UserAdminSerializer(serializers.ModelSerializer):
 class ProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'role']
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'profile_image', 'role']
         read_only_fields = ['id', 'username', 'role']
+        extra_kwargs = {
+            'email': {'required': True, 'allow_blank': False},
+            'first_name': {'required': True, 'allow_blank': False},
+            'last_name': {'required': True, 'allow_blank': False},
+        }
 
 
 class SavedAddressSerializer(serializers.ModelSerializer):

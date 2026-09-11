@@ -93,10 +93,9 @@ class OrderStatusUpdateSerializer(serializers.ModelSerializer):
 
 class CreateOrderSerializer(serializers.Serializer):
     items = OrderItemSerializer(many=True)
-    customer_name = serializers.CharField(max_length=150)
-    tax_id = serializers.CharField(max_length=30)
+    customer_name = serializers.CharField(max_length=150, required=False)
     shipping_address = serializers.CharField()
-    customer_email = serializers.EmailField()
+    customer_email = serializers.EmailField(required=False)
     shipping_city = serializers.CharField(max_length=100, required=False, allow_blank=True)
     shipping_state = serializers.CharField(max_length=100, required=False, allow_blank=True)
     shipping_postal_code = serializers.CharField(max_length=20, required=False, allow_blank=True)
@@ -107,6 +106,16 @@ class CreateOrderSerializer(serializers.Serializer):
         if not value:
             raise serializers.ValidationError("La orden debe contener al menos un producto.")
         return value
+
+    def validate(self, attrs):
+        user = self.context['request'].user
+        profile_name = f'{user.first_name} {user.last_name}'.strip()
+        profile_email = user.email.strip()
+        attrs['customer_name'] = profile_name or attrs.get('customer_name', '').strip()
+        attrs['customer_email'] = profile_email or attrs.get('customer_email', '').strip()
+        if not attrs['customer_name'] or not attrs['customer_email']:
+            raise serializers.ValidationError({'profile': 'Completa tus datos personales en tu perfil antes de comprar.'})
+        return attrs
 
     def create(self, validated_data):
         items_data = validated_data.pop('items')

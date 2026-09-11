@@ -102,7 +102,6 @@ class OrderViewSet(viewsets.ModelViewSet):
             f'Fecha: {order.created_at:%d/%m/%Y}',
             f'Vence: {order.payment_due_at:%d/%m/%Y}' if order.payment_due_at else 'Vence: -',
             f'Cliente: {order.customer_name}',
-            f'NIF/CIF: {order.tax_id}',
             f'Email: {order.customer_email}',
             f'Dirección: {order.shipping_address}',
         ]
