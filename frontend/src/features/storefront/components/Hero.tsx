@@ -107,7 +107,7 @@ export default function Hero() {
   const activeSlide = slides[activeIndex]
 
   return (
-    <section className="relative isolate overflow-hidden rounded-[40px] bg-slate-950 shadow-[0_38px_90px_-55px_rgba(15,23,42,0.95)]">
+    <section className="relative isolate overflow-hidden rounded-[40px] bg-marina-950 shadow-[0_38px_90px_-55px_rgba(15,23,42,0.95)]">
       <div className="absolute inset-0">
         {slides.map((slide, index) => {
           const isActive = index === activeIndex
@@ -133,7 +133,7 @@ export default function Hero() {
       </div>
 
       <div className="absolute inset-0 bg-[linear-gradient(105deg,rgba(15,23,42,0.86)_6%,rgba(15,23,42,0.58)_42%,rgba(15,23,42,0.22)_72%,rgba(15,23,42,0.08)_100%)]" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.16),_transparent_24%),radial-gradient(circle_at_bottom_right,_rgba(255,255,255,0.1),_transparent_26%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.16),_transparent_24%),radial-gradient(circle_at_bottom_right,_rgba(16,185,129,0.1),_transparent_26%)]" />
 
       <div className="relative z-10 flex min-h-[540px] items-end px-6 py-10 sm:min-h-[580px] sm:px-8 sm:py-12 lg:px-14 lg:py-14">
         <div
@@ -149,7 +149,7 @@ export default function Hero() {
             {activeSlide.quote}
           </h1>
 
-          <p className="mt-5 max-w-2xl text-sm leading-7 text-slate-200 sm:text-base sm:leading-8">
+          <p className="mt-5 max-w-2xl text-sm leading-7 text-marina-200 sm:text-base sm:leading-8">
             {activeSlide.description}
           </p>
 

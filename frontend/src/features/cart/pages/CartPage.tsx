@@ -236,24 +236,9 @@ export default function CartPage() {
               {/* Seguir comprando - moved below product list */}
               <Link
                 to="/products"
-                className="group block w-full rounded-2xl bg-gradient-to-r from-amber-400 via-orange-400 to-amber-500 px-6 py-4 font-semibold text-slate-950 shadow-lg shadow-amber-400/30 transition-all duration-300 hover:from-amber-500 hover:via-orange-500 hover:to-amber-600 hover:shadow-xl hover:shadow-amber-500/40 hover:-translate-y-1 focus:outline-none focus:ring-4 focus:ring-amber-400/50"
+                className="block w-full rounded-xl border border-teal-200 bg-teal-50 px-5 py-3 text-center text-sm font-semibold text-teal-800 shadow-sm transition hover:border-teal-300 hover:bg-teal-100 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-teal-200 sm:w-auto sm:px-6"
               >
-                <div className="flex items-center justify-center gap-3">
-                  <svg
-                    className="h-5 w-5 transition-transform group-hover:-translate-x-1"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
-                  </svg>
-                  <span className="tracking-wide">Seguir comprando</span>
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-950/10 text-slate-950 transition-all group-hover:bg-slate-950/20 group-hover:scale-110">
-                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </span>
-                </div>
+                Seguir comprando
               </Link>
 
               {/* Summary panel */}
@@ -289,15 +274,15 @@ export default function CartPage() {
                   <button
                     onClick={() => setShowCheckout(true)}
                     disabled={hasStockIssue || items.length === 0}
-                    className="mt-5 w-full rounded-full bg-amber-400 py-3 font-semibold text-slate-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="mt-5 w-full rounded-xl border border-slate-900 bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:border-slate-700 hover:bg-slate-700 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    Proceder al pago
+                    Proceder al checkout
                   </button>
                 ) : (
                   <Link
                     to="/login"
                     state={{ from: '/cart' }}
-                    className="mt-5 block w-full rounded-full bg-amber-400 py-3 text-center font-semibold text-slate-950 transition hover:bg-amber-300"
+                    className="mt-5 block w-full rounded-xl border border-slate-900 bg-slate-900 px-5 py-3 text-center text-sm font-semibold text-white shadow-sm transition hover:border-slate-700 hover:bg-slate-700 hover:shadow-md"
                   >
                     Inicia sesion para comprar
                   </Link>

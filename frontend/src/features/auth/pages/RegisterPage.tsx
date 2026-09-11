@@ -23,6 +23,20 @@ const registerFields: AuthField[] = [
     autoComplete: 'email',
   },
   {
+    name: 'first_name',
+    label: 'Nombre',
+    placeholder: 'Tu nombre',
+    type: 'text',
+    autoComplete: 'given-name',
+  },
+  {
+    name: 'last_name',
+    label: 'Apellidos',
+    placeholder: 'Tus apellidos',
+    type: 'text',
+    autoComplete: 'family-name',
+  },
+  {
     name: 'password',
     label: 'Contrasena',
     placeholder: 'Minimo 8 caracteres',
@@ -56,13 +70,15 @@ export default function RegisterPage() {
   const handleSubmit = async (formData: FormData) => {
     const username = String(formData.get('username') ?? '').trim()
     const email = String(formData.get('email') ?? '').trim()
+    const first_name = String(formData.get('first_name') ?? '').trim()
+    const last_name = String(formData.get('last_name') ?? '').trim()
     const password = String(formData.get('password') ?? '')
     const confirmPassword = String(formData.get('confirmPassword') ?? '')
 
     setError(null)
 
     try {
-      const authenticatedUser = await register({ username, email, password, confirmPassword })
+      const authenticatedUser = await register({ username, email, first_name, last_name, password, confirmPassword })
 
       navigate(redirectTo, {
         replace: true,

@@ -85,7 +85,7 @@ export async function apiFetch(
   const token = await getValidAccessToken()
 
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
+    ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
     Accept: 'application/json',
     ...extraHeaders,
     ...(options.headers as Record<string, string>),

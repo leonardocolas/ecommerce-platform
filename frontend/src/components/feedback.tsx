@@ -90,7 +90,7 @@ export function WarningDialog({
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex items-center justify-center rounded-full bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-amber-500 hover:text-slate-950"
+            className="inline-flex items-center justify-center rounded-full bg-marina-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-marina-800"
           >
             {confirmLabel}
           </button>

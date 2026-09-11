@@ -42,6 +42,32 @@ select {
   font: inherit;
 }
 
+button,
+a {
+  transition: color 180ms ease, background-color 180ms ease, border-color 180ms ease,
+    box-shadow 180ms ease, filter 180ms ease, transform 180ms ease;
+}
+
+button:not(:disabled):hover,
+a:hover {
+  filter: saturate(1.14) brightness(1.04);
+}
+
+button:not(:disabled):hover svg {
+  color: currentColor;
+}
+
+button svg,
+a svg {
+  color: currentColor;
+  transition: color 180ms ease, transform 180ms ease;
+}
+
+button:not(:disabled):hover svg,
+a:hover svg {
+  transform: translateY(-1px);
+}
+
 img {
   display: block;
   max-width: 100%;

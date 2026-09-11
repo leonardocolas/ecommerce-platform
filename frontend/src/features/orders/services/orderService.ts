@@ -17,7 +17,6 @@ export interface Order {
   items: OrderItem[]
   created_at: string
   customer_name: string
-  tax_id: string
   shipping_address: string
   customer_email: string
   invoice_number: string | null
@@ -72,10 +71,11 @@ export async function fetchOrder(id: number): Promise<Order> {
 export async function createOrder(
   items: { product: number; quantity: number; variant?: number | null }[],
   customer: {
-    customer_name: string
-    tax_id: string
     shipping_address: string
-    customer_email: string
+    shipping_city?: string
+    shipping_state?: string
+    shipping_postal_code?: string
+    shipping_country?: string
   },
 ): Promise<Order> {
   const data = await apiFetch('/orders/', {

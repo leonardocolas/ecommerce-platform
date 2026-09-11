@@ -130,8 +130,8 @@ export default function ProductsPage() {
             <p className="mt-2 text-slate-500">No se encontraron productos.</p>
           ) : null}
           {catalogError ? <p className="mt-2 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{catalogError}</p> : null}
-          <div className="mt-5 flex flex-wrap gap-3">
-            <select value={category} onChange={(event) => updateCatalogParam('category', event.target.value)} className="rounded-lg border border-slate-200 px-3 py-2 text-sm">
+          <div className="mt-5 flex flex-wrap gap-3 rounded-2xl border border-slate-200 bg-slate-50/80 p-3">
+            <select value={category} onChange={(event) => updateCatalogParam('category', event.target.value)} className="rounded-xl border border-teal-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100">
               <option value="">Todas las categorías</option>
               <option value="Moda">Moda</option>
               <option value="Hogar">Hogar</option>
@@ -139,9 +139,9 @@ export default function ProductsPage() {
               <option value="Joyeria">Joyería</option>
               <option value="Alimentos">Alimentos</option>
             </select>
-            <input type="number" min="0" value={minPrice} onChange={(event) => updateCatalogParam('min_price', event.target.value)} placeholder="Precio mínimo" className="w-32 rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-            <input type="number" min="0" value={maxPrice} onChange={(event) => updateCatalogParam('max_price', event.target.value)} placeholder="Precio máximo" className="w-32 rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-            <select value={ordering} onChange={(event) => updateCatalogParam('ordering', event.target.value)} className="rounded-lg border border-slate-200 px-3 py-2 text-sm">
+            <input type="number" min="0" value={minPrice} onChange={(event) => updateCatalogParam('min_price', event.target.value)} placeholder="Precio mínimo" className="w-32 rounded-xl border border-sky-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-sky-500 focus:ring-2 focus:ring-sky-100" />
+            <input type="number" min="0" value={maxPrice} onChange={(event) => updateCatalogParam('max_price', event.target.value)} placeholder="Precio máximo" className="w-32 rounded-xl border border-sky-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-sky-500 focus:ring-2 focus:ring-sky-100" />
+            <select value={ordering} onChange={(event) => updateCatalogParam('ordering', event.target.value)} className="rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition focus:border-rose-500 focus:ring-2 focus:ring-rose-100">
               <option value="-updated_at">Más recientes</option>
               <option value="variant_price">Precio menor</option>
               <option value="-variant_price">Precio mayor</option>

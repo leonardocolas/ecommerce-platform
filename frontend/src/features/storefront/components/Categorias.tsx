@@ -10,12 +10,14 @@ export interface Category {
 type CategoryVisual = {
   icon: CategoryIcon
   color: string
+  hoverColor: string
   description: string
 }
 
 type IconProps = {
   className?: string
   strokeWidth?: number
+  color?: string
 }
 
 type CategoryIcon = (props: IconProps) => ReactNode
@@ -28,12 +30,13 @@ function BaseIcon({
   className,
   children,
   strokeWidth = 1.8,
+  color,
 }: IconProps & { children: ReactNode }) {
   return (
     <svg
       viewBox="0 0 24 24"
       fill="none"
-      stroke="currentColor"
+      stroke={color || 'currentColor'}
       strokeWidth={strokeWidth}
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -177,52 +180,62 @@ const DEFAULT_CATEGORIES: Category[] = [
 const CATEGORY_VISUALS: Record<string, CategoryVisual> = {
   all: {
     icon: ShoppingBagIcon,
-    color: '#0f172a',
+    color: '#0f766e',
+    hoverColor: '#dff7f2',
     description: 'Recorre el catalogo completo sin perder contexto.',
   },
   hogar: {
     icon: HomeIcon,
-    color: '#0f766e',
+    color: '#047857',
+    hoverColor: '#e4f6ed',
     description: 'Muebles, decoracion y piezas para elevar cualquier espacio.',
   },
   jardin: {
     icon: TreesIcon,
-    color: '#16a34a',
+    color: '#15803d',
+    hoverColor: '#e7f7e9',
     description: 'Exterior, herramientas y productos para zonas verdes.',
   },
   moda: {
     icon: ShirtIcon,
-    color: '#dc2626',
+    color: '#be123c',
+    hoverColor: '#fff0f3',
     description: 'Prendas y accesorios con foco en estilo y combinacion.',
   },
   joyeria: {
     icon: GemIcon,
-    color: '#a855f7',
+    color: '#7c3aed',
+    hoverColor: '#f1ebff',
     description: 'Collares, pendientes y detalles que brillan por si solos.',
   },
   alimentos: {
     icon: UtensilsCrossedIcon,
-    color: '#ca8a04',
+    color: '#b45309',
+    hoverColor: '#fff5df',
     description: 'Sabores, packs gourmet y productos para consentirte.',
   },
   tecnologia: {
     icon: LaptopIcon,
-    color: '#2563eb',
+    color: '#0369a1',
+    hoverColor: '#e6f5ff',
     description: 'Equipos y accesorios para una compra mas conectada.',
   },
   regalos: {
     icon: GiftIcon,
-    color: '#db2777',
+    color: '#be185d',
+    hoverColor: '#fff0f7',
     description: 'Ideas listas para sorprender o resolver un detalle especial.',
   },
   belleza: {
     icon: SparklesIcon,
-    color: '#f97316',
+    color: '#c2410c',
+    hoverColor: '#fff1e8',
     description: 'Rutinas, cuidado personal y productos con presencia.',
   },
   otros: {
     icon: PackageIcon,
-    color: '#64748b',
+    color: '#475569',
+    hoverColor: '#f1f5f9',
     description: 'Productos fuera de las familias principales del catalogo.',
   },
 }
@@ -277,18 +290,21 @@ function CategoryCard({
       aria-label={category.name}
       aria-pressed={isActive}
       className={cn(
-        'group flex min-w-[240px] flex-col rounded-[28px] border px-5 py-5 text-left transition duration-300 ease-out',
+        'group flex min-w-[240px] flex-col rounded-[28px] border px-5 py-5 text-left transition duration-300 ease-out hover:bg-[var(--category-hover)]',
         'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-amber-400',
         isActive
           ? 'border-transparent bg-slate-950 text-white shadow-[0_26px_60px_-40px_rgba(15,23,42,0.85)]'
           : 'border-slate-200/80 bg-white/80 text-slate-900 hover:-translate-y-1 hover:border-slate-300 hover:shadow-[0_24px_60px_-44px_rgba(15,23,42,0.45)]',
       )}
       style={
-        isActive
-          ? {
-              backgroundImage: `linear-gradient(140deg, ${visual.color} 0%, #0f172a 82%)`,
-            }
-          : undefined
+        {
+          '--category-hover': visual.hoverColor,
+          ...(isActive
+            ? {
+                backgroundImage: `linear-gradient(140deg, ${visual.color} 0%, #0f172a 82%)`,
+              }
+            : {}),
+        } as React.CSSProperties
       }
     >
       <div className="flex items-start justify-between gap-4">
@@ -299,7 +315,7 @@ function CategoryCard({
           )}
           style={!isActive ? { color: visual.color, backgroundColor: `${visual.color}15` } : undefined}
         >
-          <Icon className="h-6 w-6" strokeWidth={1.8} />
+          <Icon className="h-6 w-6" strokeWidth={1.8} color={visual.color} />
         </span>
 
         {typeof category.count === 'number' ? (
@@ -316,7 +332,7 @@ function CategoryCard({
 
       <div className="mt-5 space-y-2">
         <h3 className="text-lg font-semibold leading-tight">{category.name}</h3>
-        <p className={cn('text-sm leading-6', isActive ? 'text-white/78' : 'text-slate-600')}>
+        <p className={cn('text-sm leading-6', isActive ? 'text-white/78' : 'text-slate-600 group-hover:text-slate-700')}>
           {category.description ?? visual.description}
         </p>
       </div>

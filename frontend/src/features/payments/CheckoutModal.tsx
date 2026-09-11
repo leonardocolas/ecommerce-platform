@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { createOrder } from '../orders/services/orderService'
 import { useCartStore } from '../cart/services/cartService'
-import { downloadOrderProforma } from '../orders/services/orderService'
+import { apiFetch } from '../../lib/apiFetch'
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
@@ -91,6 +91,17 @@ interface CheckoutModalProps {
   onClose: () => void
 }
 
+type SavedAddress = {
+  id: number
+  label: string
+  address: string
+  city: string
+  state: string
+  postal_code: string
+  country: string
+  is_default: boolean
+}
+
 export default function CheckoutModal({ onClose }: CheckoutModalProps) {
   const navigate = useNavigate()
   const { items, total, clearCart, discountAmount } = useCartStore()
@@ -105,12 +116,21 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
   const [createdOrderId, setCreatedOrderId] = useState<number | null>(null)
   const [createdOrder, setCreatedOrder] = useState<Awaited<ReturnType<typeof createOrder>> | null>(null)
   const [errorMessage, setErrorMessage] = useState('')
-  const [customer, setCustomer] = useState({
-    customer_name: '',
-    tax_id: '',
-    shipping_address: '',
-    customer_email: '',
-  })
+  const [profileReady, setProfileReady] = useState(false)
+  const [addresses, setAddresses] = useState<SavedAddress[]>([])
+  const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null)
+
+  useEffect(() => {
+    Promise.all([apiFetch('/auth/profile/'), apiFetch('/auth/addresses/')])
+      .then(([profile, savedAddresses]) => {
+        const user = profile as { first_name?: string; last_name?: string; email?: string }
+        setProfileReady(Boolean(user.first_name?.trim() && user.last_name?.trim() && user.email?.trim()))
+        const nextAddresses = savedAddresses as SavedAddress[]
+        setAddresses(nextAddresses)
+        setSelectedAddressId(nextAddresses.find((address) => address.is_default)?.id ?? nextAddresses[0]?.id ?? null)
+      })
+      .catch(() => setErrorMessage('No se pudo cargar tu perfil. Revisa tus datos antes de comprar.'))
+  }, [])
 
   function markStep(index: number, done: boolean, nextActive: boolean) {
     setStepsState((prev) =>
@@ -123,6 +143,11 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
   }
 
   async function handleConfirm() {
+    const selectedAddress = addresses.find((address) => address.id === selectedAddressId)
+    if (!profileReady || !selectedAddress) {
+      setErrorMessage('Completa tus datos personales y guarda una dirección en Mi perfil para continuar.')
+      return
+    }
     setStep('processing')
 
     // ── Paso 1: Crear orden ──────────────────────────────────────────────────
@@ -138,7 +163,13 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
           quantity: item.quantity,
           variant: item.variant_id,
         }))
-        const order = await createOrder(orderPayload, customer)
+        const order = await createOrder(orderPayload, {
+          shipping_address: selectedAddress.address,
+          shipping_city: selectedAddress.city,
+          shipping_state: selectedAddress.state,
+          shipping_postal_code: selectedAddress.postal_code,
+          shipping_country: selectedAddress.country,
+        })
       orderId = order.id
       setCreatedOrderId(orderId)
         setCreatedOrder(order)
@@ -153,11 +184,6 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
     markStep(1, true, false)
     setStep('success')
     await clearCart()
-  }
-
-  async function downloadInvoice() {
-    if (!createdOrder) return
-    await downloadOrderProforma(createdOrder.id)
   }
 
   function handleGoToOrder() {
@@ -196,10 +222,26 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
           </p>
 
           <div className="mb-5 grid gap-3 sm:grid-cols-2">
-            <input required placeholder="Nombre completo" value={customer.customer_name} onChange={(e) => setCustomer({ ...customer, customer_name: e.target.value })} className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-amber-400 focus:outline-none" />
-            <input required placeholder="NIF/CIF" value={customer.tax_id} onChange={(e) => setCustomer({ ...customer, tax_id: e.target.value })} className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-amber-400 focus:outline-none" />
-            <input required type="email" placeholder="Email" value={customer.customer_email} onChange={(e) => setCustomer({ ...customer, customer_email: e.target.value })} className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-amber-400 focus:outline-none sm:col-span-2" />
-            <textarea required placeholder="Dirección de entrega" value={customer.shipping_address} onChange={(e) => setCustomer({ ...customer, shipping_address: e.target.value })} className="min-h-20 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-amber-400 focus:outline-none sm:col-span-2" />
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600 sm:col-span-2">
+              Tus datos personales y dirección se tomarán de Mi perfil. {profileReady ? 'Perfil completo.' : 'Completa nombre, apellidos y correo para comprar.'}
+            </div>
+            {addresses.length > 0 ? (
+              <select
+                value={selectedAddressId ?? ''}
+                onChange={(event) => setSelectedAddressId(Number(event.target.value))}
+                className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-amber-400 focus:outline-none sm:col-span-2"
+              >
+                {addresses.map((address) => (
+                  <option key={address.id} value={address.id}>
+                    {address.label}: {address.address}, {address.city}, {address.postal_code}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-800 sm:col-span-2">
+                No tienes una dirección guardada. Añádela desde Mi perfil antes de generar el pedido.
+              </p>
+            )}
           </div>
 
           {/* Lista de items */}
@@ -304,10 +346,9 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
           </div>
 
           <div className="mt-6 flex w-full flex-wrap gap-3">
-            <button onClick={downloadInvoice} className="w-full rounded-full bg-amber-400 py-3 text-sm font-semibold text-slate-950 transition hover:bg-amber-300">Descargar Factura PDF</button>
             <button
               onClick={onClose}
-              className="flex-1 rounded-full border border-slate-200 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              className="flex-1  border border-slate-200 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
             >
               Seguir comprando
             </button>

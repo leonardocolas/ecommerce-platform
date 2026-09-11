@@ -26,6 +26,16 @@ function getMinLength(fieldName: AuthFieldName) {
   return undefined
 }
 
+function EyeIcon({ crossed = false }: { crossed?: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5" aria-hidden="true">
+      <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="12" cy="12" r="2.5" />
+      {crossed ? <path d="m4 4 16 16" strokeLinecap="round" /> : null}
+    </svg>
+  )
+}
+
 export default function AuthForm({ onSubmit, submitLabel, error, fields }: AuthFormProps) {
   const [loading, setLoading] = useState(false)
   const [visibleFields, setVisibleFields] = useState<Set<string>>(new Set())
@@ -76,9 +86,9 @@ export default function AuthForm({ onSubmit, submitLabel, error, fields }: AuthF
                   else next.add(field.name)
                   return next
                 })}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-slate-500 hover:text-slate-950"
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-slate-500"
               >
-                {visibleFields.has(field.name) ? '◉' : '◌'}
+                <EyeIcon crossed={!visibleFields.has(field.name)} />
               </button>
             ) : null}
           </div>

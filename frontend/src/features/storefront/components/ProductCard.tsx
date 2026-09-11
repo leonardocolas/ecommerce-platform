@@ -80,10 +80,10 @@ export default function ProductCard({
     return `${base} border border-slate-950 text-slate-950 hover:bg-slate-950 hover:text-white`
   }
 
-  return (
-    <article className="flex h-full flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_18px_50px_-40px_rgba(15,23,42,0.5)]">
+return (
+    <article className="flex h-full flex-col overflow-hidden rounded-[28px] border border-marina-200 bg-white shadow-[0_18px_50px_-40px_rgba(15,23,42,0.5)]">
       {/* ── Imagen ──────────────────────────────────────────────────────────── */}
-      <div className="relative h-52 overflow-hidden bg-[linear-gradient(135deg,#f59e0b_0%,#facc15_48%,#86efac_100%)]">
+      <div className="relative h-52 overflow-hidden bg-[linear-gradient(135deg,marina-50_0%,marina-100_48%,marina-200_100%)]">
         {product.imageUrl ? (
           <img
             src={product.imageUrl}
@@ -95,10 +95,10 @@ export default function ProductCard({
 
         {/* Badge de categoría y stock */}
         <div className="absolute left-4 top-4 flex flex-wrap gap-2">
-          <span className="rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-slate-900">
+          <span className="rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-marina-900">
             {product.categoryLabel}
           </span>
-          <span className="rounded-full bg-slate-950/80 px-3 py-1 text-xs font-semibold text-white">
+          <span className="rounded-full bg-marina-950/80 px-3 py-1 text-xs font-semibold text-white">
             Stock {product.stock}
           </span>
         </div>
@@ -106,7 +106,7 @@ export default function ProductCard({
         {/* Badge "En carrito" — persiste mientras el producto esté en el carrito */}
         {inCart && (
           <div className="absolute right-4 top-4">
-            <span className="flex items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-xs font-bold text-slate-950 shadow-md">
+            <span className="flex items-center gap-1 rounded-full bg-marina-100 px-2.5 py-1 text-xs font-bold text-marina-700 shadow-md">
               <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   strokeLinecap="round"
@@ -124,16 +124,16 @@ export default function ProductCard({
       {/* ── Información ─────────────────────────────────────────────────────── */}
       <div className="flex flex-1 flex-col p-6">
         <div>
-          <p className="text-xs uppercase tracking-[0.24em] text-slate-500">{providerName}</p>
-          <Link to={`/products/${product.slug}`} className="mt-3 block text-2xl font-semibold text-slate-950 hover:text-amber-600">
+          <p className="text-xs uppercase tracking-[0.24em] text-marina-500">{providerName}</p>
+          <Link to={`/products/${product.slug}`} className="mt-3 block text-2xl font-semibold text-marina-950 hover:text-marina-600">
             {product.name}
           </Link>
         </div>
 
-        <p className="mt-4 text-sm leading-6 text-slate-600">{product.description}</p>
+        <p className="mt-4 text-sm leading-6 text-marina-600">{product.description}</p>
 
         <div className="mt-auto pt-6">
-          <p className="text-2xl font-semibold text-slate-950">{formatCurrency(product.price)}</p>
+          <p className="text-2xl font-semibold text-marina-950">{formatCurrency(product.price)}</p>
 
           {/* Error feedback */}
           {errorMsg && (
@@ -146,7 +146,7 @@ export default function ProductCard({
             {isAuthenticated ? (
               <>
                 {/*
-                 * Prioridad de estados del botón principal:
+                 * Prioridad de estados del botón:
                  * 1. recentlyAdded  → verde "¡Agregado!" (2 s de feedback, aunque inCart ya sea true)
                  * 2. inCart         → rojo "Remover del carrito"
                  * 3. default        → "Agregar al carrito"
@@ -192,7 +192,7 @@ export default function ProductCard({
                   type="button"
                   onClick={() => navigate('/cart')}
                   disabled={outOfStock}
-                  className="inline-flex items-center justify-center rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-amber-500 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex items-center justify-center rounded-2xl bg-marina-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-marina-800 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Comprar ahora
                 </button>
@@ -201,15 +201,16 @@ export default function ProductCard({
               <>
                 <button
                   type="button"
-                  onClick={() => onPurchaseIntent(product)}
-                  className="inline-flex items-center justify-center rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-amber-500 hover:text-slate-950"
+                  onClick={() => navigate('/cart')}
+                  disabled={outOfStock}
+                  className="inline-flex items-center justify-center rounded-2xl bg-marina-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-marina-800 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Inicia sesion para comprar
+                  Comprar ahora
                 </button>
                 <Link
                   to="/register"
                   state={{ redirectTo, actionLabel: `comprar ${product.name}` }}
-                  className="inline-flex items-center justify-center rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-900 transition hover:border-slate-950 hover:bg-slate-950 hover:text-white"
+                  className="inline-flex items-center justify-center rounded-2xl border border-marina-300 px-4 py-3 text-sm font-semibold text-marina-900 transition hover:border-marina-950 hover:bg-marina-950 hover:text-white"
                 >
                   Registrarme para comprar
                 </Link>

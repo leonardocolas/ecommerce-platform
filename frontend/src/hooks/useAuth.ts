@@ -7,11 +7,16 @@ export interface AuthUser {
   username: string
   role: UserRole
   email?: string | null
+  first_name?: string
+  last_name?: string
+  profile_image?: string | null
 }
 
 export interface RegisterAccountPayload {
   username: string
   email: string
+  first_name: string
+  last_name: string
   password: string
   confirmPassword: string
 }
@@ -285,6 +290,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = async ({
     username,
     email,
+    first_name,
+    last_name,
     password,
     confirmPassword,
   }: RegisterAccountPayload) => {
@@ -297,6 +304,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (!trimmedEmail) {
       throw new Error('El correo es obligatorio.')
+    }
+
+    if (!first_name.trim() || !last_name.trim()) {
+      throw new Error('El nombre y los apellidos son obligatorios.')
     }
 
     if (password !== confirmPassword) {
@@ -312,6 +323,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       body: JSON.stringify({
         username: trimmedUsername,
         email: trimmedEmail,
+        first_name: first_name.trim(),
+        last_name: last_name.trim(),
         password,
       }),
     })
