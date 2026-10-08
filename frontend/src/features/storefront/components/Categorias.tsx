@@ -180,8 +180,8 @@ const DEFAULT_CATEGORIES: Category[] = [
 const CATEGORY_VISUALS: Record<string, CategoryVisual> = {
   all: {
     icon: ShoppingBagIcon,
-    color: '#0f766e',
-    hoverColor: '#dff7f2',
+    color: '#b6b826',
+    hoverColor: '#eaff06',
     description: 'Recorre el catalogo completo sin perder contexto.',
   },
   hogar: {
@@ -199,7 +199,7 @@ const CATEGORY_VISUALS: Record<string, CategoryVisual> = {
   moda: {
     icon: ShirtIcon,
     color: '#be123c',
-    hoverColor: '#fff0f3',
+    hoverColor: '#f9dde3',
     description: 'Prendas y accesorios con foco en estilo y combinacion.',
   },
   joyeria: {
