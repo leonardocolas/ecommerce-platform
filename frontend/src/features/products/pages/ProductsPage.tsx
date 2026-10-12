@@ -103,11 +103,17 @@ export default function ProductsPage() {
   }
 
   if (loading) {
-    return <div className="flex min-h-screen items-center justify-center">Cargando productos...</div>
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#f8f4ee] text-[#111827]">
+        <div className="luxury-shell rounded-[28px] px-8 py-5 text-sm font-medium uppercase tracking-[0.22em] text-[#111827]">
+          Cargando productos...
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-[#f8f4ee]">
       <Navbar />
       <WarningDialog
         open={Boolean(outOfStockProduct)}
@@ -122,16 +128,30 @@ export default function ProductsPage() {
       />
 
       <main className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-slate-950">
-            {search ? `Resultados para "${search}"` : 'Todos los productos'}
-          </h1>
+        <section className="luxury-shell mb-8 rounded-[30px] px-6 py-7 sm:px-8">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <span className="premium-badge">Colección</span>
+              <h1 className="mt-4 text-5xl text-[#111827] sm:text-6xl">
+                {search ? `Resultados para "${search}"` : 'Todos los productos'}
+              </h1>
+            </div>
+            <div className="rounded-full border border-[#d6b06d]/40 bg-[#fffaf5] px-4 py-2 text-[10px] font-bold uppercase tracking-[0.2em] text-[#111827]">
+              {filteredProducts.length} piezas disponibles
+            </div>
+          </div>
+
           {search && filteredProducts.length === 0 ? (
-            <p className="mt-2 text-slate-500">No se encontraron productos.</p>
+            <p className="mt-4 text-slate-600">No se encontraron productos.</p>
           ) : null}
-          {catalogError ? <p className="mt-2 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{catalogError}</p> : null}
-          <div className="mt-5 flex flex-wrap gap-3 rounded-2xl border border-slate-200 bg-slate-50/80 p-3">
-            <select value={category} onChange={(event) => updateCatalogParam('category', event.target.value)} className="rounded-xl border border-teal-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition focus:border-teal-500 focus:ring-2 focus:ring-teal-100">
+          {catalogError ? <p className="mt-4 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">{catalogError}</p> : null}
+
+          <div className="mt-6 flex flex-wrap gap-3 rounded-[22px] border border-[#e7dcc8] bg-white/60 p-3 backdrop-blur-sm">
+            <select
+              value={category}
+              onChange={(event) => updateCatalogParam('category', event.target.value)}
+              className="rounded-xl border border-[#e7dcc8] bg-white px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:border-[#d6b06d] focus:ring-2 focus:ring-[#f5e8c6]"
+            >
               <option value="">Todas las categorías</option>
               <option value="Moda">Moda</option>
               <option value="Hogar">Hogar</option>
@@ -139,16 +159,34 @@ export default function ProductsPage() {
               <option value="Joyeria">Joyería</option>
               <option value="Alimentos">Alimentos</option>
             </select>
-            <input type="number" min="0" value={minPrice} onChange={(event) => updateCatalogParam('min_price', event.target.value)} placeholder="Precio mínimo" className="w-32 rounded-xl border border-sky-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-sky-500 focus:ring-2 focus:ring-sky-100" />
-            <input type="number" min="0" value={maxPrice} onChange={(event) => updateCatalogParam('max_price', event.target.value)} placeholder="Precio máximo" className="w-32 rounded-xl border border-sky-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-sky-500 focus:ring-2 focus:ring-sky-100" />
-            <select value={ordering} onChange={(event) => updateCatalogParam('ordering', event.target.value)} className="rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm outline-none transition focus:border-rose-500 focus:ring-2 focus:ring-rose-100">
+            <input
+              type="number"
+              min="0"
+              value={minPrice}
+              onChange={(event) => updateCatalogParam('min_price', event.target.value)}
+              placeholder="Precio mínimo"
+              className="w-32 rounded-xl border border-[#e7dcc8] bg-white px-3 py-2.5 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-[#d6b06d] focus:ring-2 focus:ring-[#f5e8c6]"
+            />
+            <input
+              type="number"
+              min="0"
+              value={maxPrice}
+              onChange={(event) => updateCatalogParam('max_price', event.target.value)}
+              placeholder="Precio máximo"
+              className="w-32 rounded-xl border border-[#e7dcc8] bg-white px-3 py-2.5 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-[#d6b06d] focus:ring-2 focus:ring-[#f5e8c6]"
+            />
+            <select
+              value={ordering}
+              onChange={(event) => updateCatalogParam('ordering', event.target.value)}
+              className="rounded-xl border border-[#e7dcc8] bg-white px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:border-[#d6b06d] focus:ring-2 focus:ring-[#f5e8c6]"
+            >
               <option value="-updated_at">Más recientes</option>
               <option value="variant_price">Precio menor</option>
               <option value="-variant_price">Precio mayor</option>
               <option value="title">Nombre A-Z</option>
             </select>
           </div>
-        </div>
+        </section>
 
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {filteredProducts.map((product) => (
@@ -160,11 +198,24 @@ export default function ProductsPage() {
             />
           ))}
         </div>
+
         {totalProducts > 12 ? (
           <div className="mt-10 flex items-center justify-center gap-4">
-            <button disabled={page === 1} onClick={() => setPage((value) => value - 1)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm disabled:opacity-40">Anterior</button>
-            <span className="text-sm text-slate-500">Página {page}</span>
-            <button disabled={page * 12 >= totalProducts} onClick={() => setPage((value) => value + 1)} className="rounded-lg bg-slate-950 px-4 py-2 text-sm text-white disabled:opacity-40">Siguiente</button>
+            <button
+              disabled={page === 1}
+              onClick={() => setPage((value) => value - 1)}
+              className="rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-[#d6b06d] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Anterior
+            </button>
+            <span className="text-sm font-medium uppercase tracking-[0.18em] text-slate-500">Página {page}</span>
+            <button
+              disabled={page * 12 >= totalProducts}
+              onClick={() => setPage((value) => value + 1)}
+              className="premium-button inline-flex items-center justify-center px-5 py-2.5 text-sm font-bold uppercase tracking-[0.18em]"
+            >
+              Siguiente
+            </button>
           </div>
         ) : null}
       </main>

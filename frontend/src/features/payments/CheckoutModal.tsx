@@ -102,9 +102,41 @@ type SavedAddress = {
   is_default: boolean
 }
 
+function validateShippingAddress(address?: SavedAddress | null) {
+  if (!address) {
+    return ['Selecciona o crea una dirección de envío antes de confirmar el pedido.']
+  }
+
+  const normalizedAddress = String(address.address ?? '').trim()
+  const city = String(address.city ?? '').trim()
+  const state = String(address.state ?? '').trim()
+  const postalCode = String(address.postal_code ?? '').trim()
+  const country = String(address.country ?? '').trim()
+
+  const checks: Record<string, string> = {
+    shipping_address: 'La dirección es obligatoria y debe incluir calle y número.',
+    shipping_city: 'La ciudad es obligatoria.',
+    shipping_state: 'El estado o provincia es obligatorio.',
+    shipping_postal_code: 'El código postal es obligatorio.',
+    shipping_country: 'El país es obligatorio.',
+  }
+
+  if (!normalizedAddress || normalizedAddress.length < 6) {
+    return [checks.shipping_address]
+  }
+  if (!city) return [checks.shipping_city]
+  if (!state) return [checks.shipping_state]
+  if (!postalCode || postalCode.length < 4 || postalCode.length > 12) {
+    return [checks.shipping_postal_code]
+  }
+  if (!country) return [checks.shipping_country]
+
+  return []
+}
+
 export default function CheckoutModal({ onClose }: CheckoutModalProps) {
   const navigate = useNavigate()
-  const { items, total, clearCart, discountAmount } = useCartStore()
+  const { items, total, clearCart, discountAmount, couponCode } = useCartStore()
   const finalTotal = total - discountAmount
 
   const [step, setStep] = useState<CheckoutStep>('confirm')
@@ -144,13 +176,20 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
 
   async function handleConfirm() {
     const selectedAddress = addresses.find((address) => address.id === selectedAddressId)
-    if (!profileReady || !selectedAddress) {
-      setErrorMessage('Completa tus datos personales y guarda una dirección en Mi perfil para continuar.')
+    const shippingErrors = validateShippingAddress(selectedAddress)
+
+    if (!profileReady) {
+      setErrorMessage('Completa tus datos personales antes de confirmar la compra.')
       return
     }
+
+    if (shippingErrors.length > 0) {
+      setErrorMessage(shippingErrors[0])
+      return
+    }
+
     setStep('processing')
 
-    // ── Paso 1: Crear orden ──────────────────────────────────────────────────
     setProcessingLabel('Creando tu orden...')
     setStepsState((prev) =>
       prev.map((s, i) => ({ ...s, active: i === 0, done: false })),
@@ -158,24 +197,28 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
 
     let orderId: number
     try {
-        const orderPayload = items.map((item) => ({
-          product: item.product_id,
-          quantity: item.quantity,
-          variant: item.variant_id,
-        }))
-        const order = await createOrder(orderPayload, {
-          shipping_address: selectedAddress.address,
-          shipping_city: selectedAddress.city,
-          shipping_state: selectedAddress.state,
-          shipping_postal_code: selectedAddress.postal_code,
-          shipping_country: selectedAddress.country,
-        })
+      const orderPayload = items.map((item) => ({
+        product: item.product_id,
+        quantity: item.quantity,
+        variant: item.variant_id,
+      }))
+      const order = await createOrder(
+        orderPayload,
+        {
+          shipping_address: selectedAddress!.address,
+          shipping_city: selectedAddress!.city,
+          shipping_state: selectedAddress!.state,
+          shipping_postal_code: selectedAddress!.postal_code,
+          shipping_country: selectedAddress!.country,
+        },
+        couponCode,
+      )
       orderId = order.id
       setCreatedOrderId(orderId)
-        setCreatedOrder(order)
+      setCreatedOrder(order)
       markStep(0, true, true)
     } catch (err) {
-      setErrorMessage((err as Error).message || 'Error al crear la orden')
+      setErrorMessage((err as Error).message || 'No se pudo crear la orden. Revisa los datos de envío e inténtalo de nuevo.')
       setStep('failed')
       return
     }
@@ -213,23 +256,27 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
 
   // ─── Render confirm ────────────────────────────────────────────────────────
   if (step === 'confirm') {
+    const selectedAddress = addresses.find((address) => address.id === selectedAddressId)
+    const shippingErrors = validateShippingAddress(selectedAddress)
+
     return (
       <ModalShell onClose={onClose}>
         <div className="p-6">
-          <h2 className="mb-1 text-xl font-bold text-slate-950">Confirmar pedido</h2>
+          <span className="premium-badge">Checkout</span>
+          <h2 className="mt-4 mb-2 text-3xl text-[#111827]">Confirmar pedido</h2>
           <p className="mb-6 text-sm text-slate-500">
-            Completa tus datos para generar la factura proforma y recibir las instrucciones de transferencia.
+            Revisa el envío, la dirección y el total antes de generar la factura proforma.
           </p>
 
           <div className="mb-5 grid gap-3 sm:grid-cols-2">
-            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600 sm:col-span-2">
-              Tus datos personales y dirección se tomarán de Mi perfil. {profileReady ? 'Perfil completo.' : 'Completa nombre, apellidos y correo para comprar.'}
+            <div className="rounded-2xl border border-[#e7dcc8] bg-[#fffaf5] px-3 py-3 text-sm text-slate-600 sm:col-span-2">
+              {profileReady ? 'Perfil completo y listo para comprar.' : 'Completa nombre, apellidos y correo para comprar.'}
             </div>
             {addresses.length > 0 ? (
               <select
                 value={selectedAddressId ?? ''}
                 onChange={(event) => setSelectedAddressId(Number(event.target.value))}
-                className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-amber-400 focus:outline-none sm:col-span-2"
+                className="rounded-2xl border border-[#e7dcc8] bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-[#d6b06d] focus:outline-none sm:col-span-2"
               >
                 {addresses.map((address) => (
                   <option key={address.id} value={address.id}>
@@ -238,17 +285,40 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
                 ))}
               </select>
             ) : (
-              <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-800 sm:col-span-2">
+              <p className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-800 sm:col-span-2">
                 No tienes una dirección guardada. Añádela desde Mi perfil antes de generar el pedido.
               </p>
             )}
           </div>
 
-          {/* Lista de items */}
+          {selectedAddress && (
+            <div className="mb-4 rounded-[22px] border border-[#e7dcc8] bg-[#fffaf5] p-4">
+              <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Envío</p>
+              <p className="text-sm font-semibold text-slate-900">{selectedAddress.label}</p>
+              <p className="mt-1 text-sm text-slate-600">{selectedAddress.address}</p>
+              <p className="text-sm text-slate-600">
+                {selectedAddress.city}, {selectedAddress.state} · {selectedAddress.postal_code}
+              </p>
+              <p className="text-sm text-slate-600">{selectedAddress.country}</p>
+            </div>
+          )}
+
+          {shippingErrors.length > 0 && (
+            <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700">
+              {shippingErrors[0]}
+            </div>
+          )}
+
+          {errorMessage && (
+            <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700">
+              {errorMessage}
+            </div>
+          )}
+
           <div className="mb-4 max-h-52 overflow-y-auto space-y-2 pr-1">
             {items.map((item) => (
-              <div key={item.id} className="flex items-center gap-3 rounded-lg border border-slate-100 p-3">
-                <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded-md bg-slate-100">
+              <div key={item.id} className="flex items-center gap-3 rounded-2xl border border-[#e7dcc8] bg-[#fffaf5] p-3">
+                <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded-xl bg-[#f4e7d7]">
                   {item.product_image ? (
                     <img src={item.product_image} alt={item.product_title} className="h-full w-full object-cover" />
                   ) : (
@@ -261,37 +331,45 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="truncate text-sm font-medium text-slate-900">{item.product_title}</p>
-                  <p className="text-xs text-slate-500">
-                    {formatCurrency(item.product_price)} × {item.quantity}
-                  </p>
+                  <p className="text-xs text-slate-500">{formatCurrency(item.product_price)} × {item.quantity}</p>
                 </div>
-                <p className="text-sm font-semibold text-slate-900">{formatCurrency(item.subtotal)}</p>
+                <p className="text-sm font-semibold text-[#111827]">{formatCurrency(item.subtotal)}</p>
               </div>
             ))}
           </div>
 
-          {/* Resumen de totales */}
-          <div className="rounded-xl bg-slate-50 p-4 space-y-2">
-            <div className="flex justify-between border-t border-slate-200 pt-2 text-base font-bold text-slate-950">
+          <div className="rounded-[22px] bg-[#fffaf5] p-4 space-y-2">
+            <div className="flex justify-between text-sm text-slate-600">
+              <span>Subtotal</span>
+              <span>{formatCurrency(total)}</span>
+            </div>
+            {discountAmount > 0 && couponCode && (
+              <div className="flex justify-between text-sm font-medium text-emerald-700">
+                <span>Descuento ({couponCode})</span>
+                <span>-{formatCurrency(discountAmount)}</span>
+              </div>
+            )}
+            <div className="flex justify-between border-t border-[#e7dcc8] pt-2 text-base font-bold text-[#111827]">
               <span>Total a pagar</span>
               <span>{formatCurrency(finalTotal)}</span>
             </div>
           </div>
 
-          <p className="mt-4 rounded-lg bg-amber-50 px-4 py-3 text-xs text-amber-700 border border-amber-200">
+          <p className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-700">
             El pedido quedará pendiente de pago hasta que confirmemos tu transferencia.
           </p>
 
           <div className="mt-6 flex gap-3">
             <button
               onClick={onClose}
-              className="flex-1 rounded-full border border-slate-200 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              className="flex-1 rounded-full border border-slate-200 bg-white py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
             >
               Cancelar
             </button>
             <button
               onClick={handleConfirm}
-              className="flex-1 rounded-full bg-amber-400 py-3 text-sm font-semibold text-slate-950 transition hover:bg-amber-300"
+              disabled={!profileReady || shippingErrors.length > 0 || addresses.length === 0}
+              className="premium-button flex-1 py-3 text-sm font-bold uppercase tracking-[0.18em] disabled:cursor-not-allowed disabled:opacity-50"
             >
               Generar pedido
             </button>
@@ -371,9 +449,9 @@ export default function CheckoutModal({ onClose }: CheckoutModalProps) {
         <div className="mb-4 text-red-500">
           <IconX />
         </div>
-        <h2 className="mb-2 text-2xl font-bold text-slate-950">Pago rechazado</h2>
+        <h2 className="mb-2 text-2xl font-bold text-slate-950">No se pudo completar el pedido</h2>
         <p className="mb-6 text-sm text-slate-500">
-          {errorMessage || 'El pago no pudo procesarse. Intenta de nuevo.'}
+          {errorMessage || 'El pedido no pudo finalizarse. Revisa los datos de envío e inténtalo de nuevo.'}
         </p>
         {createdOrderId && (
           <p className="mb-4 text-xs text-slate-400">

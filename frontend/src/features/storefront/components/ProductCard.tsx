@@ -64,6 +64,33 @@ export default function ProductCard({
     }
   }
 
+  async function handleBuyNow() {
+    if (outOfStock) {
+      onPurchaseIntent(product)
+      return
+    }
+
+    if (!isAuthenticated) {
+      onPurchaseIntent(product)
+      return
+    }
+
+    if (adding || atStockLimit || inCart) {
+      navigate('/cart')
+      return
+    }
+
+    setErrorMsg(null)
+    try {
+      await addItem(product.id, 1)
+      navigate('/cart')
+    } catch (err) {
+      const msg = (err as Error).message || 'No se pudo agregar al carrito'
+      setErrorMsg(msg)
+      setTimeout(() => setErrorMsg(null), 4000)
+    }
+  }
+
   // ── Qué muestra el botón de "Agregar" (cuando NO está en carrito y no es recentlyAdded) ──
   function addButtonLabel() {
     if (outOfStock) return 'Sin stock'
@@ -77,36 +104,33 @@ export default function ProductCard({
     if (outOfStock || adding) {
       return `${base} border border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed`
     }
-    return `${base} border border-slate-950 text-slate-950 hover:bg-slate-950 hover:text-white`
+    return `${base} rounded-2xl border border-[#111827] bg-[#111827] text-white hover:bg-[#d6b06d] hover:text-[#111827]`
   }
 
-return (
-    <article className="flex h-full flex-col overflow-hidden rounded-[28px] border border-marina-200 bg-white shadow-[0_18px_50px_-40px_rgba(15,23,42,0.5)]">
-      {/* ── Imagen ──────────────────────────────────────────────────────────── */}
-      <div className="relative h-52 overflow-hidden bg-[linear-gradient(135deg,marina-50_0%,marina-100_48%,marina-200_100%)]">
+  return (
+    <article className="premium-card group flex h-full flex-col overflow-hidden rounded-[30px] p-0 transition-transform duration-300 hover:-translate-y-1.5 hover:shadow-[0_30px_80px_-50px_rgba(17,24,39,0.7)]">
+      <div className="relative h-64 overflow-hidden bg-[linear-gradient(135deg,#f4e7d7_0%,#e9efe5_45%,#dfe7f7_100%)]">
         {product.imageUrl ? (
           <img
             src={product.imageUrl}
             alt={product.name}
-            className="h-full w-full object-cover transition duration-500 hover:scale-105"
+            className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
           />
         ) : null}
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(15,23,42,0.08)_0%,rgba(15,23,42,0.68)_100%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(17,24,39,0.08)_0%,rgba(17,24,39,0.68)_100%)]" />
 
-        {/* Badge de categoría y stock */}
         <div className="absolute left-4 top-4 flex flex-wrap gap-2">
-          <span className="rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-marina-900">
+          <span className="rounded-full bg-[#f8f4ee]/90 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[#1f2937] backdrop-blur-sm">
             {product.categoryLabel}
           </span>
-          <span className="rounded-full bg-marina-950/80 px-3 py-1 text-xs font-semibold text-white">
+          <span className="rounded-full bg-[#111827]/70 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[#f8e7c2] backdrop-blur-sm">
             Stock {product.stock}
           </span>
         </div>
 
-        {/* Badge "En carrito" — persiste mientras el producto esté en el carrito */}
         {inCart && (
           <div className="absolute right-4 top-4">
-            <span className="flex items-center gap-1 rounded-full bg-marina-100 px-2.5 py-1 text-xs font-bold text-marina-700 shadow-md">
+            <span className="flex items-center gap-1 rounded-full bg-[#d6b06d] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[#111827] shadow-md">
               <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   strokeLinecap="round"
@@ -121,19 +145,21 @@ return (
         )}
       </div>
 
-      {/* ── Información ─────────────────────────────────────────────────────── */}
       <div className="flex flex-1 flex-col p-6">
         <div>
-          <p className="text-xs uppercase tracking-[0.24em] text-marina-500">{providerName}</p>
-          <Link to={`/products/${product.slug}`} className="mt-3 block text-2xl font-semibold text-marina-950 hover:text-marina-600">
+          <p className="text-[10px] uppercase tracking-[0.28em] text-[#b78a44]">{providerName}</p>
+          <Link to={`/products/${product.slug}`} className="mt-3 block text-2xl font-semibold text-[#111827] hover:text-[#b78a44]">
             {product.name}
           </Link>
         </div>
 
-        <p className="mt-4 text-sm leading-6 text-marina-600">{product.description}</p>
+        <p className="mt-4 text-sm leading-6 text-slate-600">{product.description}</p>
 
         <div className="mt-auto pt-6">
-          <p className="text-2xl font-semibold text-marina-950">{formatCurrency(product.price)}</p>
+          <div className="flex items-end justify-between gap-4">
+            <p className="text-3xl font-semibold text-[#111827]">{formatCurrency(product.price)}</p>
+            <span className="text-[10px] uppercase tracking-[0.2em] text-slate-400">Premium</span>
+          </div>
 
           {/* Error feedback */}
           {errorMsg && (
@@ -190,27 +216,27 @@ return (
 
                 <button
                   type="button"
-                  onClick={() => navigate('/cart')}
-                  disabled={outOfStock}
-                  className="inline-flex items-center justify-center rounded-2xl bg-marina-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-marina-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  onClick={handleBuyNow}
+                  disabled={adding}
+                  className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-[#d6b06d] hover:text-[#111827] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Comprar ahora
+                  {adding ? 'Agregando...' : 'Comprar ahora'}
                 </button>
               </>
             ) : (
               <>
                 <button
                   type="button"
-                  onClick={() => navigate('/cart')}
+                  onClick={handleBuyNow}
                   disabled={outOfStock}
-                  className="inline-flex items-center justify-center rounded-2xl bg-marina-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-marina-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex items-center justify-center rounded-2xl border border-[#111827] bg-[#111827] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#d6b06d] hover:text-[#111827] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Comprar ahora
                 </button>
                 <Link
                   to="/register"
                   state={{ redirectTo, actionLabel: `comprar ${product.name}` }}
-                  className="inline-flex items-center justify-center rounded-2xl border border-marina-300 px-4 py-3 text-sm font-semibold text-marina-900 transition hover:border-marina-950 hover:bg-marina-950 hover:text-white"
+                  className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-[#d6b06d] hover:text-[#111827]"
                 >
                   Registrarme para comprar
                 </Link>

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 
+import personaComprandoImage from '../../../img/HeroImg/personacomprando.webp'
 import { WarningDialog } from '../../../components/feedback'
 import Footer from '../../../layout/Footer'
 import Navbar from '../../../layout/Navbar'
@@ -56,11 +57,11 @@ function buildCategorySummaries(products: CatalogProduct[]): Category[] {
       id: 'all',
       name: 'Todas',
       count: products.length,
-      description: 'Ver el catalogo completo sin perder ninguna categoria.',
+      description: 'Ver el catálogo completo sin perder ninguna categoría.',
     },
     ...sortedCategories.map((category) => ({
       ...category,
-      description: `Filtra rapidamente los ${(category.count ?? 0).toString()} productos disponibles en ${category.name.toLowerCase()}.`,
+      description: `Explora los ${(category.count ?? 0).toString()} productos disponibles en ${category.name.toLowerCase()}.`,
     })),
   ]
 }
@@ -91,10 +92,10 @@ export default function HomePage() {
 
         if (backendProducts.products.length > 0) {
           setProducts(backendProducts.products)
-          setCatalogMessage(`Catalogo activo cargado: ${backendProducts.products.length} productos.`)
+          setCatalogMessage(`Catálogo listo para descubrir: ${backendProducts.products.length} productos.`)
         } else {
           setProducts([])
-          setCatalogMessage('No hay productos activos publicados en este momento.')
+          setCatalogMessage('Estamos preparando nuevas piezas para el catálogo.')
         }
       } catch (errorValue: unknown) {
         if (!isMounted) {
@@ -105,7 +106,7 @@ export default function HomePage() {
         setCatalogMessage(
           errorValue instanceof Error
             ? errorValue.message
-            : 'No pudimos cargar el catalogo activo.',
+            : 'No pudimos cargar el catálogo. Inténtalo de nuevo en unos momentos.',
         )
       } finally {
         if (isMounted) {
@@ -159,7 +160,7 @@ export default function HomePage() {
     }
 
     setInteractionMessage(
-      `Sesion activa para ${user.username} con rol ${user.role}. Ya puedes continuar la compra de ${product.name}.`,
+      `Sesión iniciada. Ya puedes continuar con ${product.name}.`,
     )
   }
 
@@ -180,7 +181,7 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(251,191,36,0.18),_transparent_22%),radial-gradient(circle_at_bottom_right,_rgba(16,185,129,0.18),_transparent_26%),linear-gradient(180deg,#fff8ec_0%,#f8fafc_42%,#eef7f1_100%)]">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(214,176,109,0.15),_transparent_24%),radial-gradient(circle_at_bottom_right,_rgba(122,143,114,0.12),_transparent_28%),linear-gradient(180deg,#f9f3eb_0%,#f8f4ee_42%,#f3f5f3_100%)]">
       <Navbar />
       <WarningDialog
         open={Boolean(outOfStockProduct)}
@@ -194,15 +195,46 @@ export default function HomePage() {
         onClose={() => setOutOfStockProduct(null)}
       />
 
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <main className="mx-auto max-w-[1440px] px-4 py-5 sm:px-6 sm:py-8 lg:px-10">
         <Hero />
-        <Categorias
-          categories={categories}
-          title="Encuentra lo que buscas mas rapido"
-          subtitle="Cada categoria te lleva directo a los productos relacionados y te ayuda a explorar el catalogo con un enfoque mucho mas claro."
-          activeCategoryId={activeCategoryId}
-          onCategoryClick={handleCategorySelection}
-        />
+        <div id="colecciones" className="scroll-mt-8">
+          <Categorias
+            categories={categories}
+            title="Encuentra tu próxima pieza favorita"
+            subtitle="Explora por categoría y descubre opciones para cada espacio, momento y estilo."
+            activeCategoryId={activeCategoryId}
+            onCategoryClick={handleCategorySelection}
+          />
+        </div>
+
+        <section className="relative mt-8 grid min-h-[360px] overflow-hidden rounded-[30px] bg-[#151b26] shadow-[0_35px_90px_-55px_rgba(17,24,39,0.75)] sm:min-h-[400px] sm:rounded-[38px] lg:grid-cols-[1.05fr_0.95fr]">
+          <div className="relative z-10 flex flex-col justify-center px-6 py-10 sm:px-10 sm:py-12 lg:px-14">
+            <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#e2c58f]">
+              Luz Marina · tienda para descubrir
+            </span>
+            <h2 className="mt-5 max-w-xl text-4xl leading-[0.98] text-white sm:text-5xl lg:text-6xl">
+              Lo cotidiano, con un toque extraordinario.
+            </h2>
+            <p className="mt-5 max-w-lg text-sm leading-7 text-white/70 sm:text-base">
+              Recorre una selección de moda, hogar, tecnología y mucho más. Encuentra algo que te
+              guste, a tu ritmo.
+            </p>
+            <Link
+              to="/products"
+              className="premium-button mt-7 inline-flex w-fit items-center justify-center px-6 py-3.5 text-xs font-bold uppercase tracking-[0.18em] sm:text-sm"
+            >
+              Explorar la tienda
+            </Link>
+          </div>
+          <div className="absolute inset-0 lg:relative lg:min-h-full">
+            <img
+              src={personaComprandoImage}
+              alt=""
+              className="h-full w-full object-cover object-center opacity-35 lg:opacity-100"
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-[#151b26] via-[#151b26]/75 to-transparent lg:bg-gradient-to-r lg:from-[#151b26] lg:via-[#151b26]/20 lg:to-transparent" />
+          </div>
+        </section>
 
         {!isCatalogLoading ? (
           <>
@@ -220,25 +252,30 @@ export default function HomePage() {
         ) : null}
 
         {interactionMessage ? (
-          <section className="mt-8 rounded-[28px] border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-900">
+          <section role="status" className="mt-8 rounded-[22px] border border-[#d6b06d]/35 bg-[#fffaf5] px-5 py-4 text-sm text-[#55442c] shadow-sm">
             {interactionMessage}
           </section>
         ) : null}
 
-        <section className="mt-8 rounded-[28px] border border-slate-200 bg-white/90 px-5 py-4 text-sm text-slate-600 shadow-sm">
-          {isCatalogLoading
-            ? 'Cargando catalogo publico...'
-            : (catalogMessage ?? 'Catalogo listo para explorar.')}
+        <section
+          role={catalogMessage && products.length === 0 && !isCatalogLoading ? 'status' : undefined}
+          className={`mt-8 rounded-[22px] border px-5 py-4 text-sm ${
+            catalogMessage && products.length === 0 && !isCatalogLoading
+              ? 'border-amber-200 bg-amber-50 text-amber-900'
+              : 'border-[#e7dcc8] bg-white/70 text-slate-600'
+          }`}
+        >
+          {isCatalogLoading ? 'Cargando selección...' : (catalogMessage ?? 'Catálogo listo para explorar.')}
         </section>
 
-        <section ref={catalogSectionRef} className="mt-8">
+        <section ref={catalogSectionRef} className="mt-12 scroll-mt-8">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-sm uppercase tracking-[0.28em] text-amber-700">Catalogo</p>
-              <h2 className="mt-2 text-3xl font-semibold text-slate-950">
+              <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-[#b78a44]">La selección</p>
+              <h2 className="mt-2 text-4xl text-[#111827] sm:text-5xl">
                 {activeCategoryId === 'all'
-                  ? 'Productos destacados'
-                  : `Productos en ${activeCategory?.name ?? 'la categoria seleccionada'}`}
+                  ? 'Piezas para descubrir'
+                  : `Productos en ${activeCategory?.name ?? 'la categoría seleccionada'}`}
               </h2>
             </div>
             <p className="max-w-xl text-sm leading-6 text-slate-600">
@@ -255,7 +292,7 @@ export default function HomePage() {
                 onClick={() => setActiveCategoryId('all')}
                 className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 transition hover:border-slate-950 hover:bg-slate-950 hover:text-white"
               >
-                Ver todo el catalogo
+                Ver todo el catálogo
               </button>
             </div>
           ) : null}
@@ -272,9 +309,9 @@ export default function HomePage() {
           </div>
 
           {visibleProducts.length === 0 ? (
-            <div className="mt-6 rounded-[28px] border border-dashed border-slate-300 bg-white/70 px-6 py-8 text-sm text-slate-600">
-              No encontramos productos para esta categoria todavia. Prueba con otra o vuelve a ver
-              todo el catalogo.
+            <div className="mt-6 rounded-[28px] border border-dashed border-[#d9cdb8] bg-white/70 px-6 py-8 text-sm text-slate-600">
+            No encontramos productos para esta categoría todavía. Prueba con otra o vuelve a ver
+            todo el catálogo.
             </div>
           ) : null}
         </section>

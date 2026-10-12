@@ -1,18 +1,29 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  color: #0f172a;
-  background-color: #f8fafc;
+  color: #111827;
+  background-color: #f5efe7;
   color-scheme: light;
-  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+  font-family: 'Manrope', 'Segoe UI', sans-serif;
   font-synthesis: none;
   line-height: 1.5;
   font-weight: 400;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  --luxury-ink: #111827;
+  --luxury-soft: #f8f4ee;
+  --luxury-paper: #fffaf5;
+  --luxury-gold: #d6b06d;
+  --luxury-gold-deep: #b78a44;
+  --luxury-charcoal: #121826;
+  --luxury-charcoal-soft: #1f2937;
+  --luxury-moss: #7a8f72;
+  --luxury-blush: #efe6df;
 }
 
 * {
@@ -27,7 +38,30 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background: #f8fafc;
+  background:
+    radial-gradient(circle at top left, rgba(214, 176, 109, 0.16), transparent 24%),
+    radial-gradient(circle at bottom right, rgba(122, 143, 114, 0.16), transparent 30%),
+    linear-gradient(180deg, #f9f3eb 0%, #f6f2ec 35%, #f3f5f7 100%);
+  color: var(--luxury-ink);
+}
+
+h1,
+h2,
+h3,
+h4,
+.display-font {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  letter-spacing: -0.04em;
+}
+
+p,
+span,
+button,
+input,
+select,
+textarea,
+a {
+  font-family: 'Manrope', 'Segoe UI', sans-serif;
 }
 
 a {
@@ -53,19 +87,15 @@ a:hover {
   filter: saturate(1.14) brightness(1.04);
 }
 
-button:not(:disabled):hover svg {
-  color: currentColor;
+button:not(:disabled):hover svg,
+a:hover svg {
+  transform: translateY(-1px);
 }
 
 button svg,
 a svg {
   color: currentColor;
   transition: color 180ms ease, transform 180ms ease;
-}
-
-button:not(:disabled):hover svg,
-a:hover svg {
-  transform: translateY(-1px);
 }
 
 img {
@@ -75,4 +105,80 @@ img {
 
 #root {
   min-height: 100vh;
+}
+
+.luxury-shell {
+  position: relative;
+  overflow: hidden;
+  background: rgba(255, 250, 245, 0.72);
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  box-shadow: 0 30px 80px -52px rgba(17, 24, 39, 0.55);
+  backdrop-filter: blur(18px);
+}
+
+.luxury-shell::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(135deg, rgba(214, 176, 109, 0.09), transparent 46%, rgba(122, 143, 114, 0.12));
+}
+
+.premium-card {
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  background: rgba(255, 255, 255, 0.84);
+  box-shadow: 0 24px 60px -48px rgba(17, 24, 39, 0.55);
+  backdrop-filter: blur(8px);
+}
+
+.premium-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(214, 176, 109, 0.45);
+  background: rgba(255, 247, 225, 0.85);
+  color: #3b2a1d;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  padding: 0.7rem 1rem;
+}
+
+.premium-button {
+  position: relative;
+  overflow: hidden;
+  border-radius: 9999px;
+  border: 1px solid rgba(17, 24, 39, 0.12);
+  background: linear-gradient(135deg, #f5e5be 0%, #d6b06d 100%);
+  color: #1c1917;
+  box-shadow: 0 12px 34px -18px rgba(185, 141, 78, 0.9);
+}
+
+.premium-button.secondary {
+  background: rgba(17, 24, 39, 0.04);
+  color: #111827;
+}
+
+.premium-button::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, rgba(255, 255, 255, 0.36), transparent 42%, rgba(255, 255, 255, 0.18));
+  transform: translateX(-120%);
+  transition: transform 400ms ease;
+}
+
+.premium-button:hover::after {
+  transform: translateX(120%);
+}
+
+.soft-scrollbar::-webkit-scrollbar {
+  height: 8px;
+}
+
+.soft-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(17, 24, 39, 0.18);
+  border-radius: 9999px;
 }

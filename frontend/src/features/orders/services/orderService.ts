@@ -77,10 +77,17 @@ export async function createOrder(
     shipping_postal_code?: string
     shipping_country?: string
   },
+  couponCode?: string | null,
 ): Promise<Order> {
+  const payload = {
+    items,
+    ...customer,
+    ...(couponCode ? { coupon_code: couponCode } : {}),
+  }
+
   const data = await apiFetch('/orders/', {
     method: 'POST',
-    body: JSON.stringify({ items, ...customer }),
+    body: JSON.stringify(payload),
   })
   return data as Order
 }

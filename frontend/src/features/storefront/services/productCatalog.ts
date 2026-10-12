@@ -368,11 +368,18 @@ export async function fetchPublicCatalogProducts(params: {
     }
 
     const payload = (await response.json().catch(() => [])) as unknown
-    const paginated = isRecord(payload) && Array.isArray(payload.results)
-    const pageProducts = Array.isArray(payload) ? payload : paginated ? payload.results : []
+    const paginatedPayload = isRecord(payload) ? payload : null
+    const pageProducts: unknown[] = Array.isArray(payload)
+      ? payload
+      : Array.isArray(paginatedPayload?.results)
+        ? paginatedPayload.results
+        : []
     rawProducts.push(...pageProducts)
-    totalCount = paginated && typeof payload.count === 'number' ? payload.count : rawProducts.length
-    nextUrl = paginated && typeof payload.next === 'string' ? payload.next : null
+    totalCount =
+      paginatedPayload && typeof paginatedPayload.count === 'number'
+        ? paginatedPayload.count
+        : rawProducts.length
+    nextUrl = paginatedPayload && typeof paginatedPayload.next === 'string' ? paginatedPayload.next : null
   }
 
   return {

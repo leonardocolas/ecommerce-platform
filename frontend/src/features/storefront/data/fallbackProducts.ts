@@ -14,6 +14,8 @@ export const fallbackProducts: CatalogProduct[] = [
     categoryLabel: 'Alimentos',
     imageUrl: null,
     tags: ['cafe', 'desayuno'],
+    variants: [],
+    images: [],
   },
   {
     id: 102,
@@ -27,6 +29,8 @@ export const fallbackProducts: CatalogProduct[] = [
     categoryLabel: 'Alimentos',
     imageUrl: null,
     tags: ['miel', 'natural'],
+    variants: [],
+    images: [],
   },
   {
     id: 103,
@@ -40,6 +44,8 @@ export const fallbackProducts: CatalogProduct[] = [
     categoryLabel: 'Regalos',
     imageUrl: null,
     tags: ['regalo', 'gourmet'],
+    variants: [],
+    images: [],
   },
   {
     id: 104,
@@ -53,5 +59,7 @@ export const fallbackProducts: CatalogProduct[] = [
     categoryLabel: 'Alimentos',
     imageUrl: null,
     tags: ['chocolate', 'cacao'],
+    variants: [],
+    images: [],
   },
 ]

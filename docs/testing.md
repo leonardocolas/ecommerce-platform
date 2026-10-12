@@ -31,12 +31,22 @@ cd backend
 python manage.py test
 ```
 
-### Lint y build frontend
+### Frontend
 
 ```bash
+npm run test
 npm run lint
 npm run build
 ```
+
+### CI recomendado
+
+La integración continua debe ejecutar en cada PR:
+
+- `npm run lint`
+- `npm run test`
+- `npm run build`
+- `cd backend && python manage.py test`
 
 ## Recomendaciones
 
