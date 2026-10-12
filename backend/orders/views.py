@@ -1,5 +1,6 @@
 from decimal import Decimal
 import csv
+import logging
 
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
@@ -20,7 +21,9 @@ from .serializers import (
 )
 from .permissions import IsOwnerOrAdmin, IsStaffOrAdmin
 from .inventory import release_order_stock_once
-from users.permissions import is_admin_user
+from users.permissions import is_admin_user, IsPlatformAdmin
+
+logger = logging.getLogger(__name__)
 
 
 class OrderViewSet(viewsets.ModelViewSet):
@@ -64,7 +67,9 @@ class OrderViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action == 'create':
             return [permissions.IsAuthenticated()]
-        elif self.action in ['update', 'partial_update', 'destroy', 'refund', 'confirm_payment']:
+        if self.action in {'confirm_payment', 'refund', 'export'}:
+            return [permissions.IsAuthenticated(), IsPlatformAdmin()]
+        if self.action in {'update', 'partial_update', 'destroy'}:
             return [IsStaffOrAdmin()]
         return [permissions.IsAuthenticated(), IsOwnerOrAdmin()]
 
@@ -85,6 +90,12 @@ class OrderViewSet(viewsets.ModelViewSet):
                 from_status=previous_status, to_status=order.status,
                 note=order.cancellation_reason,
             )
+            logger.info('order.transition', extra={
+                'order_id': order.id,
+                'actor_id': self.request.user.id,
+                'from_status': previous_status,
+                'to_status': order.status,
+            })
 
     @action(detail=True, methods=['get'])
     def proforma(self, request, pk=None):

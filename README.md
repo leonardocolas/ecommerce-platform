@@ -69,9 +69,12 @@ DB_USER=postgres
 DB_PASSWORD=postgres
 DB_HOST=localhost
 DB_PORT=5432
+DJANGO_ENV=development
 DJANGO_SECRET_KEY=tu-secret-key
 DJANGO_DEBUG=True
+DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
 CORS_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000
+PAYMENT_SIMULATION_ENABLED=True
 BANK_ACCOUNT_HOLDER=Tienda Demo S.L.
 BANK_NAME=Banco Demo
 BANK_IBAN=ESXX XXXX XXXX XXXX XXXX XXXX
@@ -126,6 +129,7 @@ npm run dev:backend
 npm run build
 npm run preview
 npm run lint
+npm run test
 ```
 
 ## Funcionalidades actuales

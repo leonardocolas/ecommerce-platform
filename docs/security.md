@@ -34,7 +34,15 @@ El proyecto está preparado para desarrollo pero no para despliegue sin revisió
 - desactivar `DEBUG`;
 - usar HTTPS;
 - forzar cookies/headers seguros si se usa sesión;
-- limitar `ALLOWED_HOSTS`.
+- limitar `ALLOWED_HOSTS`;
+- configurar `DJANGO_ENV=production`, `DJANGO_ALLOWED_HOSTS` y `CORS_ALLOWED_ORIGINS` explícitos.
+
+### 1.1) Hardening aplicado
+
+- se valida `DJANGO_ENV` y se bloquea ejecución con `DEBUG=True` en producción;
+- `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE` y `SECURE_HSTS_*` se habilitan para producción;
+- la fila de permisos administrativos separa `ADMIN` de `STAFF`/`PROVIDER` en rutas sensibles;
+- se registran cambios de estado clave en pedidos y pagos para auditoría.
 
 ### 2) Validación y sanitización
 

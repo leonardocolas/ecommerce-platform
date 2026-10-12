@@ -2,34 +2,72 @@ import os
 from pathlib import Path
 from datetime import timedelta
 
+from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / '.env')
 
+ENVIRONMENT = os.getenv('DJANGO_ENV', 'development').strip().lower()
+if ENVIRONMENT not in {'development', 'test', 'production'}:
+    raise ImproperlyConfigured('DJANGO_ENV must be development, test, or production.')
+
 
 def env_bool(name, default=False):
     value = os.getenv(name)
     if value is None:
         return default
-    return value.lower() in {'1', 'true', 'yes', 'on'}
+    normalized = value.strip().lower()
+    if normalized not in {'1', 'true', 'yes', 'on', '0', 'false', 'no', 'off'}:
+        raise ImproperlyConfigured(f'{name} must be a boolean value.')
+    return normalized in {'1', 'true', 'yes', 'on'}
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'change-me-in-backend-env')
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', '').strip()
+if not SECRET_KEY and ENVIRONMENT != 'production':
+    SECRET_KEY = 'development-only-insecure-secret-key'
+if ENVIRONMENT == 'production' and (
+    not SECRET_KEY or SECRET_KEY == 'change-me-in-backend-env'
+):
+    raise ImproperlyConfigured('DJANGO_SECRET_KEY must be set to a unique secret in production.')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = env_bool('DJANGO_DEBUG', False)
+DEBUG = env_bool('DJANGO_DEBUG', ENVIRONMENT == 'development')
+if ENVIRONMENT == 'production' and DEBUG:
+    raise ImproperlyConfigured('DJANGO_DEBUG must be false in production.')
 
 ALLOWED_HOSTS = [
     host.strip()
     for host in os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
     if host.strip()
 ]
+if ENVIRONMENT == 'production' and (not ALLOWED_HOSTS or '*' in ALLOWED_HOSTS):
+    raise ImproperlyConfigured('DJANGO_ALLOWED_HOSTS must contain explicit production hosts.')
+
+SECURE_SSL_REDIRECT = env_bool(
+    'DJANGO_SECURE_SSL_REDIRECT', ENVIRONMENT == 'production',
+)
+SESSION_COOKIE_SECURE = ENVIRONMENT == 'production'
+CSRF_COOKIE_SECURE = ENVIRONMENT == 'production'
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
+X_FRAME_OPTIONS = 'DENY'
+SECURE_HSTS_SECONDS = int(os.getenv(
+    'DJANGO_SECURE_HSTS_SECONDS', '31536000' if ENVIRONMENT == 'production' else '0',
+))
+SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool(
+    'DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS', ENVIRONMENT == 'production',
+)
+SECURE_HSTS_PRELOAD = env_bool(
+    'DJANGO_SECURE_HSTS_PRELOAD', ENVIRONMENT == 'production',
+)
+if env_bool('DJANGO_TRUST_X_FORWARDED_PROTO', False):
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 AUTH_USER_MODEL = 'users.User'
 
@@ -91,10 +129,11 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
+DEFAULT_DB_ENGINE = 'django.db.backends.sqlite3' if ENVIRONMENT == 'test' else 'django.db.backends.postgresql'
 DATABASES = {
     'default': {
-        'ENGINE': os.getenv('DB_ENGINE', 'django.db.backends.postgresql'),
-        'NAME': os.getenv('DB_NAME', 'ecommerce_db'),
+        'ENGINE': os.getenv('DB_ENGINE', DEFAULT_DB_ENGINE),
+        'NAME': os.getenv('DB_NAME', str(BASE_DIR / 'test.sqlite3' if ENVIRONMENT == 'test' else 'ecommerce_db')),
         'USER': os.getenv('DB_USER', 'postgres'),
         'PASSWORD': os.getenv('DB_PASSWORD', ''),
         'HOST': os.getenv('DB_HOST', 'localhost'),
@@ -180,3 +219,16 @@ EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
 EMAIL_USE_TLS = env_bool('EMAIL_USE_TLS', True)
 TAX_RATE = os.getenv('TAX_RATE', '0.00')
 SHIPPING_FLAT_RATE = os.getenv('SHIPPING_FLAT_RATE', '0.00')
+PAYMENT_SIMULATION_ENABLED = env_bool('PAYMENT_SIMULATION_ENABLED', DEBUG)
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {'class': 'logging.StreamHandler'},
+    },
+    'loggers': {
+        'orders': {'handlers': ['console'], 'level': 'INFO', 'propagate': False},
+        'payments': {'handlers': ['console'], 'level': 'INFO', 'propagate': False},
+    },
+}

@@ -93,13 +93,14 @@ class OrderStatusUpdateSerializer(serializers.ModelSerializer):
 
 class CreateOrderSerializer(serializers.Serializer):
     items = OrderItemSerializer(many=True)
-    customer_name = serializers.CharField(max_length=150, required=False)
-    shipping_address = serializers.CharField()
-    customer_email = serializers.EmailField(required=False)
-    shipping_city = serializers.CharField(max_length=100, required=False, allow_blank=True)
-    shipping_state = serializers.CharField(max_length=100, required=False, allow_blank=True)
-    shipping_postal_code = serializers.CharField(max_length=20, required=False, allow_blank=True)
-    shipping_country = serializers.CharField(max_length=100, required=False)
+    customer_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    tax_id = serializers.CharField(max_length=30, required=False, allow_blank=True, trim_whitespace=True)
+    shipping_address = serializers.CharField(max_length=500, trim_whitespace=True, required=False, allow_blank=True)
+    customer_email = serializers.EmailField(required=False, allow_blank=True)
+    shipping_city = serializers.CharField(max_length=100, trim_whitespace=True, required=False, allow_blank=True)
+    shipping_state = serializers.CharField(max_length=100, trim_whitespace=True, required=False, allow_blank=True)
+    shipping_postal_code = serializers.CharField(max_length=20, trim_whitespace=True, required=False, allow_blank=True)
+    shipping_country = serializers.CharField(max_length=100, trim_whitespace=True, required=False, allow_blank=True)
     coupon_code = serializers.CharField(max_length=50, required=False, allow_blank=True, write_only=True)
 
     def validate_items(self, value):
@@ -110,11 +111,32 @@ class CreateOrderSerializer(serializers.Serializer):
     def validate(self, attrs):
         user = self.context['request'].user
         profile_name = f'{user.first_name} {user.last_name}'.strip()
-        profile_email = user.email.strip()
-        attrs['customer_name'] = profile_name or attrs.get('customer_name', '').strip()
-        attrs['customer_email'] = profile_email or attrs.get('customer_email', '').strip()
+        profile_email = (user.email or '').strip()
+        attrs['customer_name'] = (profile_name or attrs.get('customer_name', '')).strip()
+        attrs['customer_email'] = (profile_email or attrs.get('customer_email', '')).strip()
+
         if not attrs['customer_name'] or not attrs['customer_email']:
             raise serializers.ValidationError({'profile': 'Completa tus datos personales en tu perfil antes de comprar.'})
+
+        attrs['tax_id'] = str(attrs.get('tax_id', '')).strip()
+        attrs['shipping_address'] = str(attrs.get('shipping_address', '')).strip()
+        attrs['shipping_city'] = str(attrs.get('shipping_city', '')).strip()
+        attrs['shipping_state'] = str(attrs.get('shipping_state', '')).strip()
+        attrs['shipping_postal_code'] = str(attrs.get('shipping_postal_code', '')).strip()
+        attrs['shipping_country'] = str(attrs.get('shipping_country', '') or 'España').strip() or 'España'
+
+        if not attrs['shipping_address']:
+            raise serializers.ValidationError({'shipping_address': 'La dirección de envío es obligatoria.'})
+        if len(attrs['shipping_address']) < 6:
+            raise serializers.ValidationError({'shipping_address': 'La dirección debe incluir calle y número.'})
+
+        postal_code = attrs['shipping_postal_code']
+        if postal_code and (len(postal_code) < 4 or len(postal_code) > 12):
+            raise serializers.ValidationError({'shipping_postal_code': 'El código postal no parece válido.'})
+
+        if attrs['shipping_country'] and len(attrs['shipping_country']) < 2:
+            raise serializers.ValidationError({'shipping_country': 'El país de envío es obligatorio.'})
+
         return attrs
 
     def create(self, validated_data):
